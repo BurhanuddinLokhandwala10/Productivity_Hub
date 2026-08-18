@@ -1,4 +1,7 @@
 const PlatformAccount = require('../models/PlatformAccount');
+const { githubApiCall } = require('../services/githubServices')
+
+
 const platformConnect = async (req, res) => {
     const { platform, username } = req.body;
 
@@ -27,4 +30,34 @@ const platformConnect = async (req, res) => {
     }
 }
 
-module.exports = { platformConnect }
+
+const githubStats = async (req, res) => {
+    console.log("USER ID FROM MIDDLEWARE", req.userId)
+    const account = await PlatformAccount.findOne({ userId: req.userId })
+    if (!account) {
+        res.status(404).json({
+            message: "Platform Account Not Found"
+        })
+        return;
+    }
+
+    const username = account.username
+    const platform = account.platform
+    console.log("Username in Controller", username)
+
+    if (platform === "github") {
+        const stats = await githubApiCall(username)
+        if (stats) {
+            res.status(200).json({
+                message: "Github Stats Fetched Successfully",
+                stats
+            })
+        } else {
+            res.status(500).json({
+                message: "Failed to Fetch Github Stats"
+            })
+        }
+    }
+}
+
+module.exports = { platformConnect, githubStats }
