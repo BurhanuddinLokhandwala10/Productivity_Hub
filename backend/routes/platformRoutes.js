@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { platformConnect, githubStats } = require('../controllers/platformController');
+const { platformRegister, getPlatformStats } = require('../controllers/platformController');
 const Middleware = require('../middlewares/authMiddlewares');
 
-router.post('/connect', Middleware, platformConnect);
-router.get('/github-stats', Middleware, githubStats)
+router.post('/register', Middleware, platformRegister);
+router.get('/stats', Middleware, getPlatformStats)
 
 module.exports = router;

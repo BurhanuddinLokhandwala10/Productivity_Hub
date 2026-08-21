@@ -13,10 +13,6 @@ const Middleware = async (req, res, next) => {
     try {
         const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
         req.userId = decodedToken.id;
-        // res.status(200).json({
-        //     message: "Token Verified Successfully",
-        //     user: decodedToken
-        // })
         next();
     } catch (e) {
         return res.status(401).json({ message: "Invalid Token" });

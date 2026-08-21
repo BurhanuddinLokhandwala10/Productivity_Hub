@@ -1,8 +1,11 @@
 const PlatformAccount = require('../models/PlatformAccount');
 const { githubApiCall } = require('../services/githubServices')
+const { leetcodeAPICall } = require('../services/leetcodeServices')
+const { saveLeetcodeSnapshot } = require('../repositories/leetcodeRepositories')
+const { saveGithubSnapshot } = require('../repositories/githubRespository')
 
 
-const platformConnect = async (req, res) => {
+const platformRegister = async (req, res) => {
     const { platform, username } = req.body;
 
     if (!platform || !username) {
@@ -31,9 +34,9 @@ const platformConnect = async (req, res) => {
 }
 
 
-const githubStats = async (req, res) => {
-    console.log("USER ID FROM MIDDLEWARE", req.userId)
-    const account = await PlatformAccount.findOne({ userId: req.userId })
+const getPlatformStats = async (req, res) => {
+    const { platform } = req.query;
+    const account = await PlatformAccount.findOne({ userId: req.userId, platform })
     if (!account) {
         res.status(404).json({
             message: "Platform Account Not Found"
@@ -42,22 +45,24 @@ const githubStats = async (req, res) => {
     }
 
     const username = account.username
-    const platform = account.platform
-    console.log("Username in Controller", username)
-
-    if (platform === "github") {
-        const stats = await githubApiCall(username)
-        if (stats) {
-            res.status(200).json({
-                message: "Github Stats Fetched Successfully",
-                stats
-            })
-        } else {
-            res.status(500).json({
-                message: "Failed to Fetch Github Stats"
-            })
+    console.log("PLATFORM:", platform)
+    try {
+        if (platform === "github") {
+            const stats = await githubApiCall(username);
+            const saveStatus = await saveGithubSnapshot(stats);
+            return res.status(200).json({ message: "Github Stats Fetched Successfully", stats, saveStatus });
         }
+
+        if (platform === "leetcode") {
+            const stats = await leetcodeAPICall(username);
+            const saveStatus = await saveLeetcodeSnapshot(stats);
+            return res.status(200).json({ message: "Leetcode Stats Fetched Successfully", stats, saveStatus });
+        }
+
+        return res.status(400).json({ message: "Invalid platform" });
+    } catch (e) {
+        return res.status(500).json({ message: "Failed to fetch stats", error: `${e}` });
     }
 }
 
-module.exports = { platformConnect, githubStats }
+module.exports = { platformRegister, getPlatformStats }

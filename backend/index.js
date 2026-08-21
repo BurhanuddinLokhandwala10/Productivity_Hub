@@ -1,6 +1,13 @@
 const express = require('express');
-const connectDB = require('./config/db')
+// Node executes require('./config/db') before you call:
+// dotenv.config();
+// So when db.js does:
+// password: process.env.POSTGRES_PASSWORD
+// the environment variable hasn't been loaded yet.
 const dotenv = require('dotenv')
+dotenv.config();
+
+const { connectDB, pool } = require('./config/db')
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes')
 const platformRoutes = require('./routes/platformRoutes')
@@ -8,13 +15,20 @@ const platformRoutes = require('./routes/platformRoutes')
 // Creating the Sever
 const app = express();
 
-dotenv.config();
+
 
 // Port 
 const PORT = process.env.PORT || 3000;
 
-// Middleware to connect to MongoDB
+// Middleware to connect to MongoDB and PostgreSQL
 connectDB();
+pool.query("SELECT NOW()", (err, result) => {
+    if (err) {
+        console.error("PostgreSQL connection failed:", err);
+    } else {
+        console.log("PostgreSQL connected:", result.rows[0]);
+    }
+});
 
 // Middleware to parse JSON bodies
 app.use(express.json())
