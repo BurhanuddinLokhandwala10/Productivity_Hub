@@ -1,8 +1,10 @@
 const PlatformAccount = require('../models/PlatformAccount');
-const { githubApiCall } = require('../services/githubServices')
+
 const { leetcodeAPICall } = require('../services/leetcodeServices')
 const { saveLeetcodeSnapshot } = require('../repositories/leetcodeRepositories')
-const { saveGithubSnapshot } = require('../repositories/githubRespository')
+const { githubApiCall, githubCommitsAPICall, githubReposAPICall } = require('../services/githubServices')
+const { saveGithubSnapshot, saveGithubRepository, saveGithubCommit } = require('../repositories/githubRespository')
+
 
 
 const platformRegister = async (req, res) => {
@@ -48,13 +50,31 @@ const getPlatformStats = async (req, res) => {
     console.log("PLATFORM:", platform)
     try {
         if (platform === "github") {
+            // getting the user profile details and saving it to database
             const stats = await githubApiCall(username);
             const saveStatus = await saveGithubSnapshot(stats);
-            return res.status(200).json({ message: "Github Stats Fetched Successfully", stats, saveStatus });
+
+            // getting the repos and saving it to database
+            const repos = await githubReposAPICall(username)
+            // basically the api is returning the array therefore we were not able to fetch the id from it 
+            // so we are going through each repo and saving it to database
+            // if it was a object then we can fetch the repo.id directly
+            for (const repo of repos) {
+                const savedRepo = await saveGithubRepository(repo);
+                const [owner, repoName] = repo.full_name.split("/");
+                const commits = await githubCommitsAPICall(owner, repoName);
+
+                for (const commit of commits) {
+                    await saveGithubCommit(commit, savedRepo.repository_id);
+                    console.log("Saved GITHUB COMMITS SUCCESSFULLY")
+                }
+            }
+            return res.status(200).json({ message: "Github Stats, Repo and Commits Fetched Successfully and Saved Successfully" });
         }
 
         if (platform === "leetcode") {
             const stats = await leetcodeAPICall(username);
+
             const saveStatus = await saveLeetcodeSnapshot(stats);
             return res.status(200).json({ message: "Leetcode Stats Fetched Successfully", stats, saveStatus });
         }

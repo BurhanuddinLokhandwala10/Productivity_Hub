@@ -15,13 +15,13 @@ const platformRoutes = require('./routes/platformRoutes')
 // Creating the Sever
 const app = express();
 
-
-
 // Port 
 const PORT = process.env.PORT || 3000;
 
 // Middleware to connect to MongoDB and PostgreSQL
 connectDB();
+
+// SELECT NOW() is a PostgreSQL function that returns the current date and time.
 pool.query("SELECT NOW()", (err, result) => {
     if (err) {
         console.error("PostgreSQL connection failed:", err);
