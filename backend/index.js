@@ -11,6 +11,9 @@ const { connectDB, pool } = require('./config/db')
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes')
 const platformRoutes = require('./routes/platformRoutes')
+const productivityRoutes = require("./routes/productivityRoutes");
+const dsaRoutes = require("./routes/dsaRoutes");
+const githubRoutes = require("./routes/githubRoutes");
 
 // Creating the Sever
 const app = express();
@@ -52,6 +55,9 @@ app.get('/', (req, res) => {
 // Router file
 app.use("/api/auth", authRoutes)
 app.use("/api/platform", platformRoutes)
+app.use("/productivity", productivityRoutes);
+app.use("/dsa", dsaRoutes);
+app.use("/github", githubRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is Running at port no ${PORT}`)

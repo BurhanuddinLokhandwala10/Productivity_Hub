@@ -1,9 +1,9 @@
 const PlatformAccount = require('../models/PlatformAccount');
 
-const { leetcodeAPICall } = require('../services/leetcodeServices')
-const { saveLeetcodeSnapshot, getProgress } = require('../repositories/leetcodeRepositories')
-const { githubApiCall, githubCommitsAPICall, githubReposAPICall } = require('../services/githubServices')
-const { saveGithubSnapshot, saveGithubRepository, saveGithubCommit } = require('../repositories/githubRespository')
+const { leetcodeAPICall } = require('../services/leetcodeService')
+const { saveLeetcodeSnapshot, getProgress } = require('../repositories/leetcodeRepository')
+const { githubApiCall, githubCommitsAPICall, githubReposAPICall } = require('../services/githubService')
+const { saveGithubSnapshot, saveGithubRepository, saveGithubCommit } = require('../repositories/githubRepository')
 
 
 
@@ -52,7 +52,7 @@ const getPlatformStats = async (req, res) => {
         if (platform === "github") {
             // getting the user profile details and saving it to database
             const stats = await githubApiCall(username);
-            const saveStatus = await saveGithubSnapshot(stats);
+            const saveStatus = await saveGithubSnapshot(stats, req.userId);
 
             // getting the repos and saving it to database
             const repos = await githubReposAPICall(username)
@@ -60,13 +60,12 @@ const getPlatformStats = async (req, res) => {
             // so we are going through each repo and saving it to database
             // if it was a object then we can fetch the repo.id directly
             for (const repo of repos) {
-                const savedRepo = await saveGithubRepository(repo);
+                const savedRepo = await saveGithubRepository(repo, req.userId);
                 const [owner, repoName] = repo.full_name.split("/");
                 const commits = await githubCommitsAPICall(owner, repoName);
 
                 for (const commit of commits) {
-                    await saveGithubCommit(commit, savedRepo.repository_id);
-                    console.log("Saved GITHUB COMMITS SUCCESSFULLY")
+                    await saveGithubCommit(commit, savedRepo.repository_id, req.userId);
                 }
             }
             return res.status(200).json({ message: "Github Stats, Repo and Commits Fetched Successfully and Saved Successfully" });
@@ -84,10 +83,15 @@ const getPlatformStats = async (req, res) => {
         return res.status(500).json({ message: "Failed to fetch stats", error: `${e}` });
     }
 }
+
+
 const getLeetcodeProgress = async (req, res) => {
-    const progress = await getProgress();
-    console.log(progress);
-    return res.status(200).json({ message: "Leetcode Progress Fetched Successfully", progress });
+    try {
+        const progress = await getProgress(req.userId);
+        return res.status(200).json({ message: "Leetcode Progress Fetched Successfully", progress });
+    } catch (error) {
+        return res.status(500).json({ message: "Failed to fetch Leetcode progress", error: `${error}` });
+    }
 }
 
 module.exports = { platformRegister, getPlatformStats, getLeetcodeProgress }
