@@ -1,7 +1,7 @@
 const PlatformAccount = require('../models/PlatformAccount');
 
 const { leetcodeAPICall } = require('../services/leetcodeService')
-const { saveLeetcodeSnapshot, getProgress } = require('../repositories/leetcodeRepository')
+const { saveLeetcodeSnapshot } = require('../repositories/leetcodeRepository')
 const { githubApiCall, githubCommitsAPICall, githubReposAPICall } = require('../services/githubService')
 const { saveGithubSnapshot, saveGithubRepository, saveGithubCommit } = require('../repositories/githubRepository')
 
@@ -84,14 +84,4 @@ const getPlatformStats = async (req, res) => {
     }
 }
 
-
-const getLeetcodeProgress = async (req, res) => {
-    try {
-        const progress = await getProgress(req.userId);
-        return res.status(200).json({ message: "Leetcode Progress Fetched Successfully", progress });
-    } catch (error) {
-        return res.status(500).json({ message: "Failed to fetch Leetcode progress", error: `${error}` });
-    }
-}
-
-module.exports = { platformRegister, getPlatformStats, getLeetcodeProgress }
+module.exports = { platformRegister, getPlatformStats }

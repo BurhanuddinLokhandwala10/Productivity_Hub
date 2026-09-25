@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 
-const authMiddleware = require("../middlewares/authMiddlewares");
+const Middleware = require("../middleware/authMiddleware");
 const { getGithubHealthScore, getGithubCommitStatsController, getGithubCommitTrendController } = require("../controllers/githubController");
 
-router.get('/readiness', authMiddleware, getGithubHealthScore);
-router.get('/stats', authMiddleware, getGithubCommitStatsController);
-router.get('/commit-trend', authMiddleware, getGithubCommitTrendController);
+router.get('/progress', Middleware, getGithubHealthScore);
+router.get('/stats', Middleware, getGithubCommitStatsController);
+router.get('/commit-trend', Middleware, getGithubCommitTrendController);
 
 module.exports = router;

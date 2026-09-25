@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Login, SignUp } = require('../controllers/authController')
-const Middleware = require('../middlewares/authMiddlewares');
+const Middleware = require('../middleware/authMiddleware');
 
 router.get('/protected-test', Middleware, (req, res) => {
     res.status(200).json({ message: "You accessed a protected route!", user: req.user });

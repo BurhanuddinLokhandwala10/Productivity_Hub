@@ -14,6 +14,7 @@ const platformRoutes = require('./routes/platformRoutes')
 const productivityRoutes = require("./routes/productivityRoutes");
 const dsaRoutes = require("./routes/dsaRoutes");
 const githubRoutes = require("./routes/githubRoutes");
+const leetcodeRoutes = require("./routes/leetcodeRoutes");
 
 // Creating the Sever
 const app = express();
@@ -53,11 +54,12 @@ app.get('/', (req, res) => {
 })
 
 // Router file
-app.use("/api/auth", authRoutes)
-app.use("/api/platform", platformRoutes)
+app.use("/auth", authRoutes)
+app.use("/platform", platformRoutes)
 app.use("/productivity", productivityRoutes);
 app.use("/dsa", dsaRoutes);
 app.use("/github", githubRoutes);
+app.use("/leetcode", leetcodeRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is Running at port no ${PORT}`)

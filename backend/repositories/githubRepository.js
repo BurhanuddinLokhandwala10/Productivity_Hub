@@ -201,4 +201,42 @@ const getGithubCommitTrend = async (userId) => {
     }));
 };
 
-module.exports = { saveGithubSnapshot, saveGithubRepository, saveGithubCommit, getGithubCommitStats, getGithubCommitTrend }
+// Trend data for health score calculation (moved from controller)
+const getGithubTrendData = async (userId) => {
+    const trendQuery = `
+        SELECT
+            COUNT(*) FILTER (
+                WHERE committed_at >= CURRENT_DATE - INTERVAL '30 days'
+            ) AS current_commits,
+
+            COUNT(*) FILTER (
+                WHERE committed_at >= CURRENT_DATE - INTERVAL '60 days'
+                AND committed_at < CURRENT_DATE - INTERVAL '30 days'
+            ) AS previous_commits
+
+        FROM github_commit
+        WHERE user_id = $1;
+    `;
+
+    const result = await pool.query(trendQuery, [userId]);
+
+    return {
+        currentCommits: Number(result.rows[0].current_commits),
+        previousCommits: Number(result.rows[0].previous_commits)
+    };
+};
+
+// Repository count for health score calculation
+const getGithubRepositoryCount = async (userId) => {
+    const repoQuery = `
+        SELECT COUNT(*) AS repositories
+        FROM github_repository
+        WHERE user_id = $1;
+    `;
+
+    const result = await pool.query(repoQuery, [userId]);
+
+    return Number(result.rows[0].repositories);
+};
+
+module.exports = { saveGithubSnapshot, saveGithubRepository, saveGithubCommit, getGithubCommitStats, getGithubCommitTrend, getGithubTrendData, getGithubRepositoryCount }

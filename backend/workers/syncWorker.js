@@ -3,11 +3,11 @@ const redis = require("../config/redis");
 const syncQueue = require("../queues/syncQueue");
 
 const PlatformAccount = require("../models/PlatformAccount");
-const { githubApiCall, githubReposAPICall, githubCommitsAPICall } = require("../services/githubServices");
+const { githubApiCall, githubReposAPICall, githubCommitsAPICall } = require("../services/githubService");
 const { saveGithubSnapshot, saveGithubRepository, saveGithubCommit } = require("../repositories/githubRepository");
 
-const { leetcodeAPICall } = require("../services/leetcodeServices");
-const { saveLeetcodeSnapshot } = require("../repositories/leetcodeRepositories");
+const { leetcodeAPICall } = require("../services/leetcodeService");
+const { saveLeetcodeSnapshot } = require("../repositories/leetcodeRepository");
 
 const worker = new Worker(
     "platform-sync",
