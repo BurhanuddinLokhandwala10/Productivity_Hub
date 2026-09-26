@@ -1,20 +1,20 @@
 import React from 'react'
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
-import Login from './pages/Login'
-import Signup from './pages/Signup'
+import { Route, Routes } from 'react-router-dom'
+import Login from './pages/Login.jsx'
+import SignUp from './pages/SignUp.jsx'
+import DashboardUI from './pages/DashboardUI.jsx'
+import ProtectedRoute from './pages/ProtectedRoute.jsx'
 
 const App = () => {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <DashboardUI />
-          </ProtectedRoute>} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<SignUp />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/dashboard" element={
+        <ProtectedRoute>
+          <DashboardUI />
+        </ProtectedRoute>} />
+    </Routes>
   )
 }
 
