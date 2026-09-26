@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 /**
- * GithubAnalyticsCard displaying stats and interactive 6-month commit activity chart
+ * GithubAnalyticsCard displaying stats and animated 6-month commit activity chart
  */
 const GithubAnalyticsCard = ({ stats = { repositories: 8, monthlyCommits: 5, activeDays: 2, trendScore: 100 } }) => {
-    // 6-month commit activity data: Jul, Aug, Sep, Oct, Nov, Dec
+    const [animated, setAnimated] = useState(false);
+    const chartRef = useRef(null);
+
+    // 6-month commit activity data
     const commitData = [
         { month: 'Jul', commits: 0 },
         { month: 'Aug', commits: 0 },
@@ -15,7 +18,16 @@ const GithubAnalyticsCard = ({ stats = { repositories: 8, monthlyCommits: 5, act
     ];
 
     const maxCommits = 10;
-    const chartHeight = 110;
+
+    // Animate bars when card scrolls into view
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => { if (entry.isIntersecting) setAnimated(true); },
+            { threshold: 0.3 }
+        );
+        if (chartRef.current) observer.observe(chartRef.current);
+        return () => observer.disconnect();
+    }, []);
 
     return (
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] flex flex-col justify-between">
@@ -34,7 +46,6 @@ const GithubAnalyticsCard = ({ stats = { repositories: 8, monthlyCommits: 5, act
 
             {/* 4 Metric Boxes */}
             <div className="grid grid-cols-2 gap-2.5 mb-5">
-                {/* Repositories */}
                 <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -46,8 +57,6 @@ const GithubAnalyticsCard = ({ stats = { repositories: 8, monthlyCommits: 5, act
                         <div className="text-[11px] font-medium text-slate-500">Repositories</div>
                     </div>
                 </div>
-
-                {/* Monthly Commits */}
                 <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -59,8 +68,6 @@ const GithubAnalyticsCard = ({ stats = { repositories: 8, monthlyCommits: 5, act
                         <div className="text-[11px] font-medium text-slate-500">Monthly Commits</div>
                     </div>
                 </div>
-
-                {/* Active Days */}
                 <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -72,8 +79,6 @@ const GithubAnalyticsCard = ({ stats = { repositories: 8, monthlyCommits: 5, act
                         <div className="text-[11px] font-medium text-slate-500">Active Days</div>
                     </div>
                 </div>
-
-                {/* Trend Score */}
                 <div className="bg-slate-50/70 border border-slate-100 rounded-xl p-3 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -87,52 +92,37 @@ const GithubAnalyticsCard = ({ stats = { repositories: 8, monthlyCommits: 5, act
                 </div>
             </div>
 
-            {/* Commit Activity (Last 6 Months) Chart */}
-            <div className="pt-2 border-t border-slate-100">
+            {/* Commit Activity Chart with animation */}
+            <div className="pt-2 border-t border-slate-100" ref={chartRef}>
                 <p className="text-xs font-bold text-slate-800 mb-3">Commit Activity (Last 6 Months)</p>
-
                 <div className="flex items-end gap-2 h-28 relative pt-2">
-                    {/* Y-axis labels */}
                     <div className="flex flex-col justify-between h-24 text-[10px] text-slate-400 pr-1 select-none">
-                        <span>10</span>
-                        <span>8</span>
-                        <span>6</span>
-                        <span>4</span>
-                        <span>2</span>
-                        <span>0</span>
+                        <span>10</span><span>8</span><span>6</span><span>4</span><span>2</span><span>0</span>
                     </div>
-
-                    {/* Chart Bars Grid */}
                     <div className="flex-1 h-24 flex items-end justify-between relative border-b border-l border-slate-200">
-                        {/* Background horizontal grid lines */}
                         <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-40">
-                            <div className="border-b border-dashed border-slate-200 w-full" />
-                            <div className="border-b border-dashed border-slate-200 w-full" />
-                            <div className="border-b border-dashed border-slate-200 w-full" />
-                            <div className="border-b border-dashed border-slate-200 w-full" />
-                            <div className="border-b border-dashed border-slate-200 w-full" />
+                            {[...Array(5)].map((_, i) => <div key={i} className="border-b border-dashed border-slate-200 w-full" />)}
                         </div>
-
-                        {/* Bars */}
                         {commitData.map((item, idx) => {
-                            const barHeight = item.commits > 0 ? (item.commits / maxCommits) * 100 : 0;
+                            const barHeight = animated && item.commits > 0 ? (item.commits / maxCommits) * 100 : 0;
                             return (
                                 <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full z-10 group">
                                     <div
-                                        style={{ height: `${barHeight}%` }}
-                                        className={`w-6 rounded-t-md transition-all duration-300 ${
+                                        style={{
+                                            height: `${barHeight}%`,
+                                            transition: `height 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) ${idx * 0.12}s`
+                                        }}
+                                        className={`w-6 rounded-t-md ${
                                             item.commits > 0
-                                                ? 'bg-gradient-to-t from-blue-500 to-indigo-400 group-hover:from-blue-600 group-hover:to-indigo-500 shadow-sm'
+                                                ? 'bg-gradient-to-t from-blue-500 to-indigo-400 group-hover:from-blue-600 group-hover:to-indigo-500 shadow-sm group-hover:shadow-md group-hover:scale-105'
                                                 : ''
-                                        }`}
+                                        } transition-[transform,box-shadow] duration-200`}
                                     />
                                 </div>
                             );
                         })}
                     </div>
                 </div>
-
-                {/* X-axis Month labels */}
                 <div className="flex justify-between pl-5 mt-1.5 text-[10px] text-slate-400 font-medium">
                     {commitData.map((item, idx) => (
                         <span key={idx} className="flex-1 text-center">{item.month}</span>
