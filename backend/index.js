@@ -15,6 +15,7 @@ const productivityRoutes = require("./routes/productivityRoutes");
 const dsaRoutes = require("./routes/dsaRoutes");
 const githubRoutes = require("./routes/githubRoutes");
 const leetcodeRoutes = require("./routes/leetcodeRoutes");
+const aiAnalystRoutes = require("./routes/aiAnalystRoutes");
 
 // Creating the Sever
 const app = express();
@@ -60,6 +61,7 @@ app.use("/productivity", productivityRoutes);
 app.use("/dsa", dsaRoutes);
 app.use("/github", githubRoutes);
 app.use("/leetcode", leetcodeRoutes);
+app.use("/ai", aiAnalystRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server is Running at port no ${PORT}`)
