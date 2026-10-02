@@ -74,7 +74,8 @@ const getPlatformStats = async (req, res) => {
         if (platform === "leetcode") {
             const stats = await leetcodeAPICall(username);
 
-            const saveStatus = await saveLeetcodeSnapshot(stats);
+            const saveStatus = await saveLeetcodeSnapshot(stats, req.userId);
+            // console.log("API CALL - ", saveStatus);
             return res.status(200).json({ message: "Leetcode Stats Fetched Successfully", stats, saveStatus });
         }
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 /**
  * LeetcodeAnalyticsCard with animated donut chart
  */
-const LeetcodeAnalyticsCard = ({ stats = { solved: 0, easy: 0, medium: 0, hard: 0, rating: 0, streak: 0 } }) => {
+const LeetcodeAnalyticsCard = ({ stats }) => {
     const [animated, setAnimated] = useState(false);
     const chartRef = useRef(null);
 

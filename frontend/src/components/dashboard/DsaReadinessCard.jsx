@@ -3,7 +3,7 @@ import React from 'react';
 /**
  * DsaReadinessCard displaying circular gauge score, priority breakdowns, and weak topics
  */
-const DsaReadinessCard = ({ data = { readinessScore: 0.58, label: 'Early Stage' } }) => {
+const DsaReadinessCard = ({data}) => {
     const weakTopics = [
         'BINARY SEARCH',
         'BIT MANIPULATION',
@@ -62,8 +62,8 @@ const DsaReadinessCard = ({ data = { readinessScore: 0.58, label: 'Early Stage' 
                         />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                        <span className="text-xl font-black text-slate-900 leading-none">0.58</span>
-                        <span className="text-[10px] font-semibold text-slate-500 mt-1">Early Stage</span>
+                        <span className="text-xl font-black text-slate-900 leading-none">{data.readinessScore}</span>
+                        <span className="text-[10px] font-semibold text-slate-500 mt-1">{data.label}</span>
                     </div>
                 </div>
 
@@ -74,7 +74,7 @@ const DsaReadinessCard = ({ data = { readinessScore: 0.58, label: 'Early Stage' 
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                             <span className="text-slate-700 font-medium text-[11px]">Must Do Problems</span>
                         </div>
-                        <span className="text-slate-800 font-bold text-[11px]">1/101 (0.99%)</span>
+                        <span className="text-slate-800 font-bold text-[11px]">{data.dsaMust.solved}/{data.dsaMust.total} ({data.dsaMust.percentage})</span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
@@ -82,7 +82,7 @@ const DsaReadinessCard = ({ data = { readinessScore: 0.58, label: 'Early Stage' 
                             <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                             <span className="text-slate-700 font-medium text-[11px]">High Priority</span>
                         </div>
-                        <span className="text-slate-800 font-bold text-[11px]">0/154 (0%)</span>
+                        <span className="text-slate-800 font-bold text-[11px]">{data.dsaHigh.solved}/{data.dsaHigh.total} ({data.dsaHigh.percentage})</span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">

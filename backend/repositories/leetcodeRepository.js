@@ -55,6 +55,16 @@ const saveLeetcodeSnapshot = async (stats, userId) => {
     const medium = submitStats.find(item => item.difficulty === "Medium");
     const hard = submitStats.find(item => item.difficulty === "Hard");
 
+    // console.log("SAVING LEETCODE SNAPSHOT:", {
+    //     totalSolved: stats.totalSolved,
+    //     easy: stats.easy,
+    //     medium: stats.medium,
+    //     hard: stats.hard,
+    //     rating: stats.rating,
+    //     streak: stats.streak,
+    //     userId
+    // });
+
     const query = `
         INSERT INTO leetcode_snapshots
         (user_id, snapshot_date, total_solved, easy_solved, medium_solved, hard_solved, rating, streak)
@@ -74,6 +84,8 @@ const saveLeetcodeSnapshot = async (stats, userId) => {
     ];
 
     const result = await pool.query(query, values);
+    console.log("LATEST 2 LEETCODE ROWS:", result.rows);
+
     return result.rows[0];
 
     // Number(github.today_commits)
@@ -88,7 +100,7 @@ const getProgress = async (userId) => {
         SELECT *
         FROM leetcode_snapshots
         WHERE user_id = $1
-        ORDER BY snapshot_date DESC
+        ORDER BY created_at DESC
         LIMIT 2;
     `;
     // 2. Execute query
@@ -105,6 +117,9 @@ const getProgress = async (userId) => {
     // 3. Get current and previous
     const currRow = result.rows[0];
     const previousRow = result.rows[1];
+
+    // console.log("Curr Row data - ", currRow)
+    // console.log("prev Row data - ", previousRow)
 
     // 4. Calculate progress
     const progress = {

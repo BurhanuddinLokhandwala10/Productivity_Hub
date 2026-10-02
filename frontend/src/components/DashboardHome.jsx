@@ -36,6 +36,10 @@ const DashboardHome = () => {
         dsaStats: {
             readinessScore: 0.58,
             label: 'Early Stage',
+            dsaDifficulty: {},
+            dsaHigh: {},
+            dsaMust: {},
+            dsaTopics: {},
         }
     });
 
@@ -70,18 +74,21 @@ const DashboardHome = () => {
                 }
 
                 if (lcRes.status === 'fulfilled' && lcRes.value.ok) {
-                    const lcData = await lcRes.value.json();
+                    const lcDataFromBackend = await lcRes.value.json();
+                    const lcData = lcDataFromBackend.progress;
                     if (lcData) {
                         setData(prev => ({
                             ...prev,
-                            leetcodeProgress: lcData.score || prev.leetcodeProgress,
+                            // ...prev -> Keep everything that was already there. Then change only what I specify.
+                            leetcodeProgress: lcData.totalProgress,
+
                             leetcodeStats: {
-                                solved: lcData.solved ?? prev.leetcodeStats.solved,
-                                easy: lcData.easy ?? prev.leetcodeStats.easy,
-                                medium: lcData.medium ?? prev.leetcodeStats.medium,
-                                hard: lcData.hard ?? prev.leetcodeStats.hard,
-                                rating: lcData.rating ?? prev.leetcodeStats.rating,
-                                streak: lcData.streak ?? prev.leetcodeStats.streak,
+                                solved: lcData.totalProgress,
+                                easy: lcData.easyProgress,
+                                medium: lcData.mediumProgress,
+                                hard: lcData.hardProgress,
+                                rating: lcData.ratingDiff,
+                                streak: lcData.streakProgress
                             }
                         }));
                     }
@@ -89,11 +96,21 @@ const DashboardHome = () => {
 
                 if (dsaRes.status === 'fulfilled' && dsaRes.value.ok) {
                     const dsaData = await dsaRes.value.json();
+
                     if (dsaData.readinessScore !== undefined) {
                         setData(prev => ({
                             ...prev,
                             dsaReadiness: dsaData.readinessScore,
                             dsaLabel: dsaData.label || 'Early Stage',
+
+                            dsaStats: {
+                                readinessScore: dsaData.readinessScore,
+                                label: dsaData.label || 'Early Stage',
+                                dsaDifficulty: dsaData.difficulty,
+                                dsaHigh: dsaData.high,
+                                dsaMust: dsaData.must,
+                                dsaTopics: dsaData.topics,
+                            }
                         }));
                     }
                 }
@@ -103,6 +120,7 @@ const DashboardHome = () => {
         };
 
         fetchDashboardData();
+        console.log("leetcode Stats - ", data.leetcodeStats);
     }, []);
 
     const handleGenerateAnalysis = async () => {
@@ -118,13 +136,17 @@ const DashboardHome = () => {
         }
     };
 
+
+
+
+
     return (
         <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header Navbar */}
-                <TopNavbar 
-                    title="Overview" 
-                    subtitle="Your complete developer productivity snapshot" 
+                <TopNavbar
+                    title="Overview"
+                    subtitle="Your complete developer productivity snapshot"
                 />
 
                 {/* Top 3 Score Cards */}
