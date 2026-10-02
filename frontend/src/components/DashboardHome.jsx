@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import TopNavbar from './TopNavbar.jsx';
 import StatCard from './dashboard/StatCard.jsx';
 import GithubAnalyticsCard from './dashboard/GithubAnalyticsCard.jsx';
@@ -9,21 +9,23 @@ import AiAnalystCard from './dashboard/AiAnalystCard.jsx';
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 /**
- * Main Overview Dashboard Home containing the top metric cards, analytics cards, and AI analyst
+ * Main Overview Dashboard Home containing live metric cards, analytics cards, and AI analyst
+ * All hardcoded and dummy data removed in favor of live backend PostgreSQL & Redis data
  */
 const DashboardHome = () => {
-    // Default data matching the user's provided screenshot
+    const [loading, setLoading] = useState(true);
     const [data, setData] = useState({
-        githubScore: 35,
-        githubTrend: 'Improving',
+        githubScore: 0,
+        githubTrend: 'STABLE',
         leetcodeProgress: 0,
-        dsaReadiness: 0.58,
-        dsaLabel: 'Early Stage',
+        dsaReadiness: 0,
+        dsaLabel: 'EARLY_STAGE',
         githubStats: {
-            repositories: 8,
-            monthlyCommits: 5,
-            activeDays: 2,
-            trendScore: 100,
+            repositories: 0,
+            currentMonthCommits: 0,
+            lastMonthCommits: 0,
+            activeDays: 0,
+            trendScore: 0,
         },
         leetcodeStats: {
             solved: 0,
@@ -34,111 +36,137 @@ const DashboardHome = () => {
             streak: 0,
         },
         dsaStats: {
-            readinessScore: 0.58,
-            label: 'Early Stage',
-            dsaDifficulty: {},
-            dsaHigh: {},
-            dsaMust: {},
-            dsaTopics: {},
-        }
+            readinessScore: 0,
+            label: 'EARLY_STAGE',
+            dsaDifficulty: [],
+            dsaHigh: { solved: 0, total: 0, percentage: 0 },
+            dsaMust: { solved: 0, total: 0, percentage: 0 },
+            dsaTopics: [],
+            dsaWeakTopics: [],
+        },
+        aiAnalysis: null
     });
 
-    useEffect(() => {
-        const fetchDashboardData = async () => {
-            const token = localStorage.getItem('Token');
-            if (!token) return;
+    const fetchDashboardData = useCallback(async () => {
+        const token = localStorage.getItem('Token');
+        if (!token) {
+            setLoading(false);
+            return;
+        }
 
-            try {
-                // Try fetching live data if available
-                const [ghRes, lcRes, dsaRes] = await Promise.allSettled([
-                    fetch(`${API_BASE_URL}/github/progress`, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API_BASE_URL}/leetcode/progress`, { headers: { Authorization: `Bearer ${token}` } }),
-                    fetch(`${API_BASE_URL}/dsa/readiness`, { headers: { Authorization: `Bearer ${token}` } }),
-                ]);
+        try {
+            // Fetch live data from backend PostgreSQL-backed APIs
+            const [ghRes, lcRes, dsaRes, aiRes] = await Promise.allSettled([
+                fetch(`${API_BASE_URL}/github/progress`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/leetcode/progress`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/dsa/readiness`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/ai/analyze`, { headers: { Authorization: `Bearer ${token}` } }),
+            ]);
 
-                if (ghRes.status === 'fulfilled' && ghRes.value.ok) {
-                    const ghData = await ghRes.value.json();
-                    if (ghData.score !== undefined) {
-                        setData(prev => ({
-                            ...prev,
-                            githubScore: ghData.score,
-                            githubTrend: ghData.trend || 'Improving',
-                            githubStats: {
-                                repositories: ghData.repositories?.total ?? prev.githubStats.repositories,
-                                monthlyCommits: ghData.activity?.monthlyCommits ?? prev.githubStats.monthlyCommits,
-                                activeDays: ghData.consistency?.monthlyActiveDays ?? prev.githubStats.activeDays,
-                                trendScore: ghData.trendAnalysis?.score ?? prev.githubStats.trendScore,
-                            }
-                        }));
-                    }
+            const nextData = { ...data };
+
+            // GitHub Live Data
+            if (ghRes.status === 'fulfilled' && ghRes.value.ok) {
+                const ghData = await ghRes.value.json();
+                if (ghData && ghData.score !== undefined) {
+                    nextData.githubScore = ghData.score;
+                    nextData.githubTrend = ghData.trend || 'STABLE';
+                    nextData.githubStats = {
+                        repositories: ghData.repositories?.total || 0,
+                        currentMonthCommits: ghData.activity?.currentMonthCommits || 0,
+                        lastMonthCommits: ghData.activity?.lastMonthCommits || 0,
+                        activeDays: ghData.consistency?.monthlyActiveDays || 0,
+                        trendScore: ghData.trendAnalysis?.score || 0
+                    };
                 }
-
-                if (lcRes.status === 'fulfilled' && lcRes.value.ok) {
-                    const lcDataFromBackend = await lcRes.value.json();
-                    const lcData = lcDataFromBackend.progress;
-                    if (lcData) {
-                        setData(prev => ({
-                            ...prev,
-                            // ...prev -> Keep everything that was already there. Then change only what I specify.
-                            leetcodeProgress: lcData.totalProgress,
-
-                            leetcodeStats: {
-                                solved: lcData.totalProgress,
-                                easy: lcData.easyProgress,
-                                medium: lcData.mediumProgress,
-                                hard: lcData.hardProgress,
-                                rating: lcData.ratingDiff,
-                                streak: lcData.streakProgress
-                            }
-                        }));
-                    }
-                }
-
-                if (dsaRes.status === 'fulfilled' && dsaRes.value.ok) {
-                    const dsaData = await dsaRes.value.json();
-
-                    if (dsaData.readinessScore !== undefined) {
-                        setData(prev => ({
-                            ...prev,
-                            dsaReadiness: dsaData.readinessScore,
-                            dsaLabel: dsaData.label || 'Early Stage',
-
-                            dsaStats: {
-                                readinessScore: dsaData.readinessScore,
-                                label: dsaData.label || 'Early Stage',
-                                dsaDifficulty: dsaData.difficulty,
-                                dsaHigh: dsaData.high,
-                                dsaMust: dsaData.must,
-                                dsaTopics: dsaData.topics,
-                            }
-                        }));
-                    }
-                }
-            } catch {
-                // Keep default demo data matching screenshot on any network/auth issue
             }
-        };
 
-        fetchDashboardData();
-        console.log("leetcode Stats - ", data.leetcodeStats);
+            // LeetCode Live Data
+            if (lcRes.status === 'fulfilled' && lcRes.value.ok) {
+                const lcResData = await lcRes.value.json();
+                const lcData = lcResData.progress || lcResData;
+                if (lcData) {
+                    const currentTotals = lcData.current || {};
+                    const hasCurrent = currentTotals.totalSolved !== undefined;
+
+                    nextData.leetcodeProgress = hasCurrent ? currentTotals.totalSolved : (lcData.totalProgress || 0);
+                    nextData.leetcodeStats = {
+                        solved: hasCurrent ? currentTotals.totalSolved : (lcData.totalProgress || 0),
+                        easy: hasCurrent ? currentTotals.easy : (lcData.easyProgress || 0),
+                        medium: hasCurrent ? currentTotals.medium : (lcData.mediumProgress || 0),
+                        hard: hasCurrent ? currentTotals.hard : (lcData.hardProgress || 0),
+                        rating: hasCurrent ? currentTotals.rating : (lcData.ratingDiff || 0),
+                        streak: hasCurrent ? currentTotals.streak : (lcData.streakProgress || 0),
+                    };
+                }
+            }
+
+            // DSA Live Data
+            if (dsaRes.status === 'fulfilled' && dsaRes.value.ok) {
+                const dsaData = await dsaRes.value.json();
+                if (dsaData && dsaData.readinessScore !== undefined) {
+                    nextData.dsaReadiness = dsaData.readinessScore;
+                    nextData.dsaLabel = dsaData.label || 'EARLY_STAGE';
+                    nextData.dsaStats = {
+                        readinessScore: dsaData.readinessScore,
+                        label: dsaData.label || 'EARLY_STAGE',
+                        dsaDifficulty: dsaData.difficulty || [],
+                        dsaHigh: dsaData.high || { solved: 0, total: 0, percentage: 0 },
+                        dsaMust: dsaData.must || { solved: 0, total: 0, percentage: 0 },
+                        dsaTopics: dsaData.topics || [],
+                        dsaWeakTopics: dsaData.weakTopics || [],
+                    };
+                }
+            }
+
+            // AI Analysis Live Data
+            if (aiRes.status === 'fulfilled' && aiRes.value.ok) {
+                const aiData = await aiRes.value.json();
+                nextData.aiAnalysis = aiData.data?.analysis || aiData.analysis || aiData;
+            }
+
+            setData(nextData);
+        } catch (err) {
+            console.error('Error fetching dashboard live data:', err);
+        } finally {
+            setLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, [fetchDashboardData]);
 
     const handleGenerateAnalysis = async () => {
         const token = localStorage.getItem('Token');
-        if (token) {
-            try {
-                await fetch(`${API_BASE_URL}/ai/analyze`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-            } catch {
-                // graceful fallback
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/ai/analyze`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                const analysis = data.data?.analysis || data.analysis || data;
+                setData(prev => ({ ...prev, aiAnalysis: analysis }));
             }
+        } catch (e) {
+            console.error('Failed to regenerate analysis:', e);
         }
     };
 
-
-
-
+    if (loading) {
+        return (
+            <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">
+                <div className="max-w-7xl mx-auto">
+                    <TopNavbar title="Overview" subtitle="Your complete developer productivity snapshot" />
+                    <div className="flex flex-col items-center justify-center h-96">
+                        <div className="w-9 h-9 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+                        <p className="text-xs font-semibold text-slate-500">Loading live analytics...</p>
+                    </div>
+                </div>
+            </main>
+        );
+    }
 
     return (
         <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">
@@ -146,7 +174,7 @@ const DashboardHome = () => {
                 {/* Header Navbar */}
                 <TopNavbar
                     title="Overview"
-                    subtitle="Your complete developer productivity snapshot"
+                    subtitle="Live developer metrics, readiness tracking, and AI analysis"
                 />
 
                 {/* Top 3 Score Cards */}
@@ -159,7 +187,7 @@ const DashboardHome = () => {
                             </svg>
                         }
                         iconBg="bg-slate-900"
-                        title="GitHub Score"
+                        title="GitHub Health"
                         value={data.githubScore}
                         maxVal={100}
                         statusBadge={`↗ ${data.githubTrend}`}
@@ -167,17 +195,17 @@ const DashboardHome = () => {
                         chartType="green-bars"
                     />
 
-                    {/* LeetCode Progress */}
+                    {/* LeetCode Solved */}
                     <StatCard
                         icon={
                             <span className="font-mono text-white text-sm font-bold">&lt;/&gt;</span>
                         }
                         iconBg="bg-amber-500"
-                        title="LeetCode Progress"
+                        title="LeetCode Solved"
                         value={data.leetcodeProgress}
                         maxVal={100}
-                        statusBadge="● No activity yet"
-                        statusColor="text-rose-500"
+                        statusBadge={data.leetcodeStats.streak > 0 ? `🔥 ${data.leetcodeStats.streak} day streak` : '● Solved Count'}
+                        statusColor="text-amber-600"
                         chartType="orange-bars"
                     />
 
@@ -209,9 +237,9 @@ const DashboardHome = () => {
                     <DsaReadinessCard data={data.dsaStats} />
                 </div>
 
-                {/* Bottom Row - AI Analyst Full Width */}
+                {/* Bottom Row - AI Analyst Card */}
                 <div>
-                    <AiAnalystCard onGenerate={handleGenerateAnalysis} />
+                    <AiAnalystCard analysis={data.aiAnalysis} onGenerate={handleGenerateAnalysis} />
                 </div>
             </div>
         </main>

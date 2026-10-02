@@ -8,21 +8,22 @@ const { getProgress } = require("../repositories/leetcodeRepository");
 const getGithubHealthScore = async (userId) => {
     const stats = await getGithubCommitStats(userId);
 
-    // Activity 40%
+    const currentCommits = stats.currentMonthCommits;
+    const previousCommits = stats.lastMonthCommits;
+
+    // Activity 40% - Current Month
     const activityScore = Math.min(
-        (stats.monthlyCommits / 100) * 100,
+        (currentCommits / 100) * 100,
         100
     );
 
-    // Consistency 30%
+    // Consistency 30% - Current Month
     const consistencyScore = Math.min(
         (stats.monthlyActiveDays / 20) * 100,
         100
     );
 
-    // Trend 20%
-    const { currentCommits, previousCommits } = await getGithubTrendData(userId);
-
+    // Trend 20% - Current Month vs Last Month
     let trendScore = 50;
     let trend = "STABLE";
 
@@ -63,7 +64,8 @@ const getGithubHealthScore = async (userId) => {
         trend,
 
         activity: {
-            monthlyCommits: stats.monthlyCommits,
+            currentMonthCommits: currentCommits,
+            lastMonthCommits: previousCommits,
             score: Number(activityScore.toFixed(2))
         },
 

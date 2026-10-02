@@ -4,7 +4,7 @@ const startSyncScheduler = async () => {
     await syncQueue.upsertJobScheduler(
         "platform-sync-scheduler",
         {
-            every: 1000
+            every: 6 * 60 * 60 * 1000 // 6 hours
         },
         {
             name: "sync-all-users",

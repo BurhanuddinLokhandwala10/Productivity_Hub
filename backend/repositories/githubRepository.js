@@ -110,13 +110,8 @@ const saveGithubCommit = async (commit, repositoryId, userId) => {
             commit_url
         )       
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-        ON CONFLICT (github_commit_sha,user_id)
-        DO UPDATE SET
-            message = EXCLUDED.message,
-            author_name = EXCLUDED.author_name,
-            author_email = EXCLUDED.author_email,
-            committed_at = EXCLUDED.committed_at,
-            commit_url = EXCLUDED.commit_url
+        ON CONFLICT (user_id, github_commit_sha)
+        DO NOTHING
         RETURNING *;
     `;
 
@@ -133,7 +128,7 @@ const saveGithubCommit = async (commit, repositoryId, userId) => {
 
     const result = await pool.query(query, values);
 
-    return result.rows[0];
+    return result.rows[0] || null;
 };
 
 const getGithubCommitStats = async (userId) => {
@@ -144,37 +139,41 @@ const getGithubCommitStats = async (userId) => {
             ) AS today_commits,
 
             COUNT(*) FILTER (
-            WHERE committed_at >= date_trunc('week', CURRENT_DATE)
+                WHERE committed_at >= date_trunc('week', CURRENT_DATE)
             ) AS weekly_commits,
 
             COUNT(*) FILTER (
                 WHERE committed_at >= date_trunc('month', CURRENT_DATE)
-            ) AS monthly_commits,
+            ) AS current_month_commits,
+
+            COUNT(*) FILTER (
+                WHERE committed_at >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month')
+                AND committed_at < date_trunc('month', CURRENT_DATE)
+            ) AS last_month_commits,
 
             COUNT(*) FILTER (
                 WHERE committed_at >= date_trunc('year', CURRENT_DATE)
             ) AS yearly_commits,
 
             COUNT(DISTINCT committed_at::date) FILTER (
-            WHERE committed_at >= date_trunc('week', CURRENT_DATE)
+                WHERE committed_at >= date_trunc('week', CURRENT_DATE)
             ) AS weekly_active_days,
 
             COUNT(DISTINCT committed_at::date) FILTER (
-            WHERE committed_at >= date_trunc('month', CURRENT_DATE)
+                WHERE committed_at >= date_trunc('month', CURRENT_DATE)
             ) AS monthly_active_days
 
         FROM github_commit
         WHERE user_id = $1;
     `;
 
-    // committed_at::date -> Our column contains 2026-09-10 14:35:20 so this (committed_at::date) converts it into 2026-09-10
-
     const result = await pool.query(query, [userId]);
 
     return {
         todayCommits: Number(result.rows[0].today_commits),
         weeklyCommits: Number(result.rows[0].weekly_commits),
-        monthlyCommits: Number(result.rows[0].monthly_commits),
+        currentMonthCommits: Number(result.rows[0].current_month_commits),
+        lastMonthCommits: Number(result.rows[0].last_month_commits),
         yearlyCommits: Number(result.rows[0].yearly_commits),
         weeklyActiveDays: Number(result.rows[0].weekly_active_days),
         monthlyActiveDays: Number(result.rows[0].monthly_active_days)

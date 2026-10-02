@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * AiAnalystCard displaying 4 insight categories (Strengths, Weaknesses, Focus Next, Recommendations)
+ * Connected to live backend data with fallback
  */
-const AiAnalystCard = ({ onGenerate }) => {
+const AiAnalystCard = ({ analysis, onGenerate }) => {
+    const navigate = useNavigate();
     const [generating, setGenerating] = useState(false);
 
     const handleGenerate = async () => {
@@ -16,9 +19,31 @@ const AiAnalystCard = ({ onGenerate }) => {
         setGenerating(false);
     };
 
+    const strengths = analysis?.strengths || [
+        "GitHub repositories configured and tracked",
+        "Curated DSA problem sheet connected"
+    ];
+
+    const weaknesses = analysis?.criticalGaps || analysis?.weaknesses || [
+        "DSA MUST questions need higher completion rate",
+        "LeetCode daily practice streak needs consistency"
+    ];
+
+    const focus = (analysis?.nextActions ? analysis.nextActions.map(a => a.action) : analysis?.focus) || [
+        "Complete remaining DSA MUST-track problems",
+        "Build daily problem-solving consistency on LeetCode",
+        "Maintain active GitHub commit velocity"
+    ];
+
+    const recommendations = analysis?.recommendations || [
+        "Focus primarily on MUST DSA questions before advancing to optional topics",
+        "Dedicate structured practice sessions to weak DSA topics",
+        "Maintain consistent code commits across active projects"
+    ];
+
     return (
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]">
-            {/* Header with Title and Generate Action */}
+            {/* Header with Title and Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div className="flex items-start gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
@@ -27,21 +52,29 @@ const AiAnalystCard = ({ onGenerate }) => {
                         </svg>
                     </div>
                     <div>
-                        <h3 className="font-bold text-slate-900 text-base">AI Analyst</h3>
-                        <p className="text-xs text-slate-500">Personalized insights and recommendations based on your developer data</p>
+                        <h3 className="font-bold text-slate-900 text-base">AI Preparation Analyst</h3>
+                        <p className="text-xs text-slate-500">Personalized insights and recommendations based on your live developer data</p>
                     </div>
                 </div>
 
-                <button
-                    onClick={handleGenerate}
-                    disabled={generating}
-                    className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer disabled:opacity-70 shrink-0"
-                >
-                    <svg className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>{generating ? 'Analyzing...' : 'Generate New Analysis'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => navigate('/dashboard/ai')}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 px-3 py-2 rounded-xl hover:bg-indigo-50 transition cursor-pointer"
+                    >
+                        Full Analysis &rarr;
+                    </button>
+                    <button
+                        onClick={handleGenerate}
+                        disabled={generating}
+                        className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 active:scale-[0.98] text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer disabled:opacity-70 shrink-0"
+                    >
+                        <svg className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>{generating ? 'Analyzing...' : 'Generate New Analysis'}</span>
+                    </button>
+                </div>
             </div>
 
             {/* 4 Cards Grid */}
@@ -54,14 +87,12 @@ const AiAnalystCard = ({ onGenerate }) => {
                             <span className="font-bold text-xs text-emerald-800">Strengths</span>
                         </div>
                         <ul className="space-y-2 text-[11px] text-slate-700 leading-relaxed">
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">GitHub repositories:</strong> 8 repos (score 100)</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">GitHub trend analysis:</strong> score 100 (commits increased from 0 to 5)</span>
-                            </li>
+                            {strengths.slice(0, 3).map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                    <span className="text-emerald-500 font-bold shrink-0">•</span>
+                                    <span>{item}</span>
+                                </li>
+                            ))}
                         </ul>
                     </div>
                 </div>
@@ -71,33 +102,15 @@ const AiAnalystCard = ({ onGenerate }) => {
                     <div>
                         <div className="flex items-center gap-2 mb-2.5">
                             <span className="text-rose-500 text-xs">⚠️</span>
-                            <span className="font-bold text-xs text-rose-800">Weaknesses</span>
+                            <span className="font-bold text-xs text-rose-800">Critical Gaps</span>
                         </div>
                         <ul className="space-y-1.5 text-[11px] text-slate-700 leading-relaxed">
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">LeetCode:</strong> No progress (all metrics at 0)</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">DSA must-track:</strong> Only 1/101 (0.99%)</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">DSA high-level:</strong> 0/154 (0%)</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">DSA medium-level:</strong> 0/178 (0%)</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">DSA hard-level:</strong> 0/33 (0%)</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span><strong className="text-slate-800">Weak topics:</strong> Binary Search, Bit Manipulation, Design &amp; OOP, Dynamic Programming, Graphs</span>
-                            </li>
+                            {weaknesses.slice(0, 3).map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                    <span className="text-rose-500 font-bold shrink-0">•</span>
+                                    <span>{item}</span>
+                                </li>
+                            ))}
                         </ul>
                     </div>
                 </div>
@@ -110,22 +123,12 @@ const AiAnalystCard = ({ onGenerate }) => {
                             <span className="font-bold text-xs text-sky-800">Focus Next</span>
                         </div>
                         <ul className="space-y-2 text-[11px] text-slate-700 leading-relaxed">
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span>Increase LeetCode problem-solving activity</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span>Complete remaining DSA must-track problems</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span>Address weak topics: Binary Search, Bit Manipulation, Design &amp; OOP, Dynamic Programming, Graphs</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span>Enhance GitHub activity and consistency</span>
-                            </li>
+                            {focus.slice(0, 3).map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                    <span className="text-sky-500 font-bold shrink-0">•</span>
+                                    <span>{item}</span>
+                                </li>
+                            ))}
                         </ul>
                     </div>
                 </div>
@@ -138,18 +141,12 @@ const AiAnalystCard = ({ onGenerate }) => {
                             <span className="font-bold text-xs text-amber-800">Recommendations</span>
                         </div>
                         <ul className="space-y-2 text-[11px] text-slate-700 leading-relaxed">
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span>Add consistent LeetCode problem solving to increase progress metrics</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span>Dedicate practice sessions to each weak topic and work through must-track problems</span>
-                            </li>
-                            <li className="flex items-start gap-1.5">
-                                <span className="text-slate-400 mt-1 shrink-0">•</span>
-                                <span>Boost GitHub contributions with regular commits and more active days</span>
-                            </li>
+                            {recommendations.slice(0, 3).map((item, idx) => (
+                                <li key={idx} className="flex items-start gap-1.5">
+                                    <span className="text-amber-500 font-bold shrink-0">•</span>
+                                    <span>{item}</span>
+                                </li>
+                            ))}
                         </ul>
                     </div>
                 </div>

@@ -1,15 +1,15 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 
 /**
- * Sidebar navigation component matching the login page dark theme and screenshot
+ * Sidebar navigation component matching the login page dark theme
+ * Uses NavLink for proper routing with active state highlighting
  */
-const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
-    const navigate = useNavigate();
-
+const Sidebar = () => {
     const menuItems = [
         {
-            id: 'overview',
+            to: '/dashboard',
+            end: true,
             label: 'Overview',
             icon: (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -18,7 +18,7 @@ const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
             )
         },
         {
-            id: 'github',
+            to: '/dashboard/github',
             label: 'GitHub Analytics',
             icon: (
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -27,14 +27,14 @@ const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
             )
         },
         {
-            id: 'leetcode',
+            to: '/dashboard/leetcode',
             label: 'LeetCode Analytics',
             icon: (
                 <span className="font-mono text-xs font-bold">&lt;/&gt;</span>
             )
         },
         {
-            id: 'dsa',
+            to: '/dashboard/dsa',
             label: 'DSA Readiness',
             icon: (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -43,7 +43,7 @@ const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
             )
         },
         {
-            id: 'ai',
+            to: '/dashboard/ai',
             label: 'AI Analyst',
             icon: (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -52,7 +52,7 @@ const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
             )
         },
         {
-            id: 'profile',
+            to: '/dashboard/profile',
             label: 'Profile',
             icon: (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -61,7 +61,7 @@ const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
             )
         },
         {
-            id: 'settings',
+            to: '/dashboard/settings',
             label: 'Settings',
             icon: (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -71,12 +71,6 @@ const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
             )
         }
     ];
-
-    const handleItemClick = (id) => {
-        if (onSelectTab) {
-            onSelectTab(id);
-        }
-    };
 
     return (
         <aside
@@ -101,25 +95,29 @@ const Sidebar = ({ activeTab = 'overview', onSelectTab }) => {
 
                 {/* Nav Links */}
                 <nav className="space-y-1.5">
-                    {menuItems.map((item) => {
-                        const isActive = activeTab === item.id;
-                        return (
-                            <button
-                                key={item.id}
-                                onClick={() => handleItemClick(item.id)}
-                                className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                    {menuItems.map((item) => (
+                        <NavLink
+                            key={item.to}
+                            to={item.to}
+                            end={item.end || false}
+                            className={({ isActive }) =>
+                                `w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
                                     isActive
                                         ? 'bg-blue-600 text-white shadow-sm shadow-blue-500/30'
                                         : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                                }`}
-                            >
-                                <span className={isActive ? 'text-white' : 'text-slate-400'}>
-                                    {item.icon}
-                                </span>
-                                <span>{item.label}</span>
-                            </button>
-                        );
-                    })}
+                                }`
+                            }
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    <span className={isActive ? 'text-white' : 'text-slate-400'}>
+                                        {item.icon}
+                                    </span>
+                                    <span>{item.label}</span>
+                                </>
+                            )}
+                        </NavLink>
+                    ))}
                 </nav>
             </div>
 

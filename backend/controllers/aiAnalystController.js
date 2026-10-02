@@ -9,8 +9,10 @@ const getAiAnalysis = async (req, res) => {
         res.status(200).json({
             data: {
                 analysis
-            }
-        })
+            },
+            analysis,
+            analytics
+        });
     } catch (error) {
         console.log(error);
         res.status(500).json({

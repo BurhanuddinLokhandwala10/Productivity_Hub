@@ -24,24 +24,69 @@ const upsertUserProgress = async (userId, questionId, status) => {
     return result.rows[0];
 };
 
-// 3. Get all progress for a user
-const findUserProgress = async (userId) => {
-    const result = await pool.query(
-        `
+// 3. Get progress / questions for a user with optional filtering
+const findUserProgress = async (userId, filters = {}) => {
+    let query = `
         SELECT
-            uqp.question_id,
+            q.id AS question_id,
             q.question,
             q.difficulty,
             q.relevance,
-            uqp.status
-        FROM user_question_progress uqp
-        JOIN questions q ON q.id = uqp.question_id
-        WHERE uqp.user_id = $1
-        ORDER BY q.id
-        `,
-        [userId]
-    );
+            COALESCE(t.topic, 'General') AS topic,
+            COALESCE(uqp.status, 'NOT_SOLVED') AS status
+        FROM questions q
+        LEFT JOIN question_topics qt ON q.id = qt.question_id
+        LEFT JOIN topics t ON qt.topic_id = t.id
+        LEFT JOIN user_question_progress uqp ON q.id = uqp.question_id AND uqp.user_id = $1
+        WHERE 1=1
+    `;
+    const values = [userId];
+
+    if (filters.topic) {
+        values.push(filters.topic);
+        query += ` AND LOWER(t.topic) = LOWER($${values.length})`;
+    }
+    if (filters.difficulty) {
+        values.push(filters.difficulty);
+        query += ` AND LOWER(q.difficulty) = LOWER($${values.length})`;
+    }
+    if (filters.relevance) {
+        values.push(filters.relevance);
+        query += ` AND LOWER(q.relevance) = LOWER($${values.length})`;
+    }
+    if (filters.status) {
+        if (filters.status.toUpperCase() === 'NOT_SOLVED') {
+            query += ` AND (uqp.status = 'NOT_SOLVED' OR uqp.status IS NULL)`;
+        } else {
+            values.push(filters.status.toUpperCase());
+            query += ` AND uqp.status = $${values.length}`;
+        }
+    }
+
+    query += ` ORDER BY q.id ASC`;
+
+    if (filters.limit) {
+        values.push(Number(filters.limit));
+        query += ` LIMIT $${values.length}`;
+        if (filters.offset) {
+            values.push(Number(filters.offset));
+            query += ` OFFSET $${values.length}`;
+        }
+    }
+
+    const result = await pool.query(query, values);
     return result.rows;
+};
+
+const getDsaFilterOptions = async () => {
+    const topicsRes = await pool.query(`SELECT DISTINCT topic FROM topics WHERE topic IS NOT NULL ORDER BY topic`);
+    const difficultiesRes = await pool.query(`SELECT DISTINCT difficulty FROM questions WHERE difficulty IS NOT NULL ORDER BY difficulty`);
+    const relevancesRes = await pool.query(`SELECT DISTINCT relevance FROM questions WHERE relevance IS NOT NULL ORDER BY relevance`);
+    return {
+        topics: topicsRes.rows.map(r => r.topic),
+        difficulties: difficultiesRes.rows.map(r => r.difficulty),
+        relevances: relevancesRes.rows.map(r => r.relevance)
+    };
 };
 
 // 4. Get DSA raw analytics data
@@ -178,6 +223,7 @@ module.exports = {
     findQuestionById,
     upsertUserProgress,
     findUserProgress,
+    getDsaFilterOptions,
     findDsaAnalyticsData,
     upsertUserTarget,
     findUserTarget,

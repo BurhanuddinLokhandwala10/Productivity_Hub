@@ -2,6 +2,7 @@ const {
     findQuestionById,
     upsertUserProgress,
     findUserProgress,
+    getDsaFilterOptions,
     findDsaAnalyticsData,
     upsertUserTarget,
     findUserTarget
@@ -39,10 +40,20 @@ const updateProgress = async (req, res) => {
 // Get user's progress
 const getProgress = async (req, res) => {
     try {
-        const progress = await findUserProgress(req.userId);
+        const filters = {
+            topic: req.query.topic,
+            difficulty: req.query.difficulty,
+            relevance: req.query.relevance,
+            status: req.query.status,
+            limit: req.query.limit,
+            offset: req.query.offset
+        };
+        const progress = await findUserProgress(req.userId, filters);
+        const filterOptions = await getDsaFilterOptions();
         res.json({
             count: progress.length,
-            progress
+            progress,
+            filterOptions
         });
     } catch (error) {
         console.error("getProgress error:", error);

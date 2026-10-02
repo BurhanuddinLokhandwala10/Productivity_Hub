@@ -1,21 +1,24 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 /**
  * DsaReadinessCard displaying circular gauge score, priority breakdowns, and weak topics
+ * Uses real live values without hardcoded percentages
  */
-const DsaReadinessCard = ({data}) => {
-    const weakTopics = [
-        'BINARY SEARCH',
-        'BIT MANIPULATION',
-        'DESIGN & OOP',
-        'DYNAMIC PROGRAMMING',
-        'GRAPHS'
-    ];
+const DsaReadinessCard = ({ data = {} }) => {
+    const navigate = useNavigate();
+
+    const readinessScore = Number(data.readinessScore) || 0;
+    const label = data.label || 'Early Stage';
+    const must = data.dsaMust || { solved: 0, total: 0, percentage: 0 };
+    const high = data.dsaHigh || { solved: 0, total: 0, percentage: 0 };
+    const weakTopics = data.dsaWeakTopics || [];
+    const difficulty = data.dsaDifficulty || [];
 
     // For a radius of 42: circumference is 2 * PI * 42 = ~264
     const circumference = 264;
-    // 58% of circumference
-    const strokeDashoffset = circumference - (circumference * 0.58);
+    const pctClamped = Math.min(Math.max(readinessScore, 0), 100) / 100;
+    const strokeDashoffset = circumference - (circumference * pctClamped);
 
     return (
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] flex flex-col justify-between">
@@ -29,7 +32,10 @@ const DsaReadinessCard = ({data}) => {
                     </div>
                     <h3 className="font-bold text-slate-800 text-sm">DSA Readiness</h3>
                 </div>
-                <button className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer">
+                <button
+                    onClick={() => navigate('/dashboard/dsa')}
+                    className="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1 cursor-pointer"
+                >
                     View Details <span>&rarr;</span>
                 </button>
             </div>
@@ -44,7 +50,7 @@ const DsaReadinessCard = ({data}) => {
                             cx="50"
                             cy="50"
                             r="42"
-                            stroke="#e2e8f0"
+                            stroke="#f1f5f9"
                             strokeWidth="9"
                             fill="transparent"
                         />
@@ -59,67 +65,66 @@ const DsaReadinessCard = ({data}) => {
                             strokeDashoffset={strokeDashoffset}
                             strokeLinecap="round"
                             fill="transparent"
+                            style={{ transition: 'stroke-dashoffset 1s ease-in-out' }}
                         />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                        <span className="text-xl font-black text-slate-900 leading-none">{data.readinessScore}</span>
-                        <span className="text-[10px] font-semibold text-slate-500 mt-1">{data.label}</span>
+                        <span className="text-xl font-black text-slate-900 leading-none">{readinessScore}%</span>
+                        <span className="text-[9px] font-bold text-indigo-600 mt-1 max-w-[80px] truncate">{label}</span>
                     </div>
                 </div>
 
                 {/* Priority Breakdown List */}
-                <div className="space-y-1.5 flex-1 pl-2">
+                <div className="space-y-2 flex-1 pl-2">
                     <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="text-slate-700 font-medium text-[11px]">Must Do Problems</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                            <span className="text-slate-700 font-medium text-[11px]">MUST Solve</span>
                         </div>
-                        <span className="text-slate-800 font-bold text-[11px]">{data.dsaMust.solved}/{data.dsaMust.total} ({data.dsaMust.percentage})</span>
+                        <span className="text-slate-800 font-bold text-[11px]">
+                            {must.solved || 0}/{must.total || 0} ({must.percentage || 0}%)
+                        </span>
                     </div>
 
                     <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                            <span className="text-slate-700 font-medium text-[11px]">High Priority</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+                            <span className="text-slate-700 font-medium text-[11px]">HIGH Priority</span>
                         </div>
-                        <span className="text-slate-800 font-bold text-[11px]">{data.dsaHigh.solved}/{data.dsaHigh.total} ({data.dsaHigh.percentage})</span>
+                        <span className="text-slate-800 font-bold text-[11px]">
+                            {high.solved || 0}/{high.total || 0} ({high.percentage || 0}%)
+                        </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-                            <span className="text-slate-700 font-medium text-[11px]">Medium Problems</span>
+                    {difficulty.slice(0, 1).map((d, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                                <span className="text-slate-700 font-medium text-[11px]">{d.difficulty} Tiers</span>
+                            </div>
+                            <span className="text-slate-800 font-bold text-[11px]">
+                                {d.solved || 0}/{d.total || 0} ({d.percentage || 0}%)
+                            </span>
                         </div>
-                        <span className="text-slate-800 font-bold text-[11px]">0/178 (0%)</span>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-                            <span className="text-slate-700 font-medium text-[11px]">Hard Problems</span>
-                        </div>
-                        <span className="text-slate-800 font-bold text-[11px]">0/33 (0%)</span>
-                    </div>
+                    ))}
                 </div>
             </div>
 
-            {/* Weak Topics Section */}
-            <div className="pt-2.5 border-t border-slate-100 mt-2">
-                <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-bold text-slate-800">Weak Topics</p>
-                    <button className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-0.5 cursor-pointer">
-                        View All <span>&rarr;</span>
-                    </button>
+            {/* Weak Topics Footer */}
+            <div className="pt-2.5 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-700">Priority Topics</span>
+                    <span className="text-[10px] text-slate-400">Needs Practice</span>
                 </div>
-                <div className="flex flex-wrap gap-1.5">
-                    {weakTopics.map((topic, idx) => (
-                        <span
-                            key={idx}
-                            className="px-2 py-1 bg-blue-50/70 border border-blue-100 text-blue-700 font-bold text-[10px] rounded-lg tracking-wider hover:bg-blue-100 transition-colors"
-                        >
-                            {topic}
+                <div className="flex flex-wrap gap-1">
+                    {weakTopics.slice(0, 3).map((item, idx) => (
+                        <span key={idx} className="px-2 py-0.5 bg-rose-50 border border-rose-100 text-rose-700 text-[9px] font-bold rounded-md">
+                            {typeof item === 'string' ? item : item.topic}
                         </span>
                     ))}
+                    {weakTopics.length === 0 && (
+                        <span className="text-[10px] text-slate-400 italic">No weak topics recorded</span>
+                    )}
                 </div>
             </div>
         </div>
