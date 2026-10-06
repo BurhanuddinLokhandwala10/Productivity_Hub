@@ -183,12 +183,12 @@ const getGithubCommitStats = async (userId) => {
 const getGithubCommitTrend = async (userId) => {
     const query = `
         SELECT
-            committed_at::date AS commit_date,
-            COUNT(*) AS commits
+            TO_CHAR(committed_at, 'YYYY-MM-DD') AS commit_date,
+            COUNT(*)::int AS commits
         FROM github_commit
         WHERE user_id = $1
         AND committed_at >= CURRENT_DATE - INTERVAL '30 days'
-        GROUP BY committed_at::date
+        GROUP BY TO_CHAR(committed_at, 'YYYY-MM-DD')
         ORDER BY commit_date ASC;
     `;
 
@@ -238,4 +238,34 @@ const getGithubRepositoryCount = async (userId) => {
     return Number(result.rows[0].repositories);
 };
 
-module.exports = { saveGithubSnapshot, saveGithubRepository, saveGithubCommit, getGithubCommitStats, getGithubCommitTrend, getGithubTrendData, getGithubRepositoryCount }
+// Daily commit activity for 12-month heatmap
+const getGithubDailyActivity = async (userId) => {
+    const query = `
+        SELECT
+            TO_CHAR(committed_at, 'YYYY-MM-DD') AS date,
+            COUNT(*)::int AS count
+        FROM github_commit
+        WHERE user_id = $1
+          AND committed_at >= CURRENT_DATE - INTERVAL '365 days'
+        GROUP BY TO_CHAR(committed_at, 'YYYY-MM-DD')
+        ORDER BY date ASC;
+    `;
+
+    const result = await pool.query(query, [userId]);
+
+    return result.rows.map(row => ({
+        date: row.date,
+        count: Number(row.count)
+    }));
+};
+
+module.exports = {
+    saveGithubSnapshot,
+    saveGithubRepository,
+    saveGithubCommit,
+    getGithubCommitStats,
+    getGithubCommitTrend,
+    getGithubTrendData,
+    getGithubRepositoryCount,
+    getGithubDailyActivity
+};

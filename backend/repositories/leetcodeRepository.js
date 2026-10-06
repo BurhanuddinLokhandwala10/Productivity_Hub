@@ -92,6 +92,7 @@ const saveLeetcodeSnapshot = async (stats, userId) => {
 
         if (isUnchanged) {
             console.log(`LeetCode data unchanged for user ${userId}, skipping new snapshot creation.`);
+            await saveLeetcodeDailyActivity(userId, stats.submissionCalendar);
             return latest;
         }
     }
@@ -117,7 +118,70 @@ const saveLeetcodeSnapshot = async (stats, userId) => {
     const result = await pool.query(query, values);
     console.log("New LeetCode snapshot created:", result.rows[0]);
 
+    // Save daily submission activity into leetcode_daily_activity (with UPSERT to prevent duplicate rows)
+    await saveLeetcodeDailyActivity(userId, stats.submissionCalendar);
+
     return result.rows[0];
+};
+
+/**
+ * Saves or updates daily submission counts into leetcode_daily_activity.
+ * Scoped strictly by (user_id, activity_date).
+ */
+const saveLeetcodeDailyActivity = async (userId, submissionCalendar) => {
+    if (!submissionCalendar) return;
+    let parsed;
+    try {
+        parsed = typeof submissionCalendar === 'string' ? JSON.parse(submissionCalendar) : submissionCalendar;
+    } catch {
+        return;
+    }
+    const entries = Object.entries(parsed).filter(([_, count]) => Number(count) >= 0);
+    if (entries.length === 0) return;
+
+    // Process in batches of 50 for efficiency and parameter limits
+    const chunkSize = 50;
+    for (let i = 0; i < entries.length; i += chunkSize) {
+        const chunk = entries.slice(i, i + chunkSize);
+        const valueClauses = [];
+        const values = [userId];
+
+        chunk.forEach(([ts, count]) => {
+            const dateStr = new Date(Number(ts) * 1000).toISOString().split('T')[0];
+            const dateIdx = values.length + 1;
+            const countIdx = values.length + 2;
+            values.push(dateStr, Number(count));
+            valueClauses.push(`($1, $${dateIdx}, $${countIdx}, CURRENT_TIMESTAMP)`);
+        });
+
+        const query = `
+            INSERT INTO leetcode_daily_activity (user_id, activity_date, submission_count, updated_at)
+            VALUES ${valueClauses.join(', ')}
+            ON CONFLICT (user_id, activity_date)
+            DO UPDATE SET submission_count = EXCLUDED.submission_count, updated_at = CURRENT_TIMESTAMP;
+        `;
+        await pool.query(query, values);
+    }
+};
+
+/**
+ * Retrieves daily LeetCode activity for the last 12 months for the authenticated user
+ */
+const getLeetcodeDailyActivity = async (userId) => {
+    const query = `
+        SELECT
+            TO_CHAR(activity_date, 'YYYY-MM-DD') AS date,
+            submission_count AS count
+        FROM leetcode_daily_activity
+        WHERE user_id = $1
+          AND activity_date >= CURRENT_DATE - INTERVAL '365 days'
+        ORDER BY activity_date ASC;
+    `;
+    const result = await pool.query(query, [userId]);
+    return result.rows.map(r => ({
+        date: r.date,
+        count: Number(r.count)
+    }));
 };
 
 const getProgress = async (userId) => {
@@ -191,4 +255,9 @@ const getProgress = async (userId) => {
     return progress;
 };
 
-module.exports = { saveLeetcodeSnapshot, getProgress };
+module.exports = {
+    saveLeetcodeSnapshot,
+    saveLeetcodeDailyActivity,
+    getLeetcodeDailyActivity,
+    getProgress
+};

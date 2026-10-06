@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import TopNavbar from '../TopNavbar.jsx';
+import ContributionHeatmap from '../common/ContributionHeatmap.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -10,6 +11,7 @@ const GitHubAnalyticsPage = () => {
     const [health, setHealth] = useState(null);
     const [stats, setStats] = useState(null);
     const [trend, setTrend] = useState([]);
+    const [activity, setActivity] = useState([]);
     const [animated, setAnimated] = useState(false);
     const chartRef = useRef(null);
 
@@ -19,10 +21,11 @@ const GitHubAnalyticsPage = () => {
         setLoading(true);
         setError('');
         try {
-            const [healthRes, statsRes, trendRes] = await Promise.all([
+            const [healthRes, statsRes, trendRes, activityRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/github/progress`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/github/stats`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/github/commit-trend`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/github/activity`, { headers: { Authorization: `Bearer ${token}` } }),
             ]);
 
             if (healthRes.ok) {
@@ -37,10 +40,16 @@ const GitHubAnalyticsPage = () => {
                 const d = await trendRes.json();
                 setTrend(d.trend || []);
             }
+            if (activityRes.ok) {
+                const d = await activityRes.json();
+                setActivity(d.activity || []);
+            }
         } catch (e) {
             setError('Unable to load GitHub analytics.');
         } finally {
             setLoading(false);
+            // Trigger animation after DOM render
+            setTimeout(() => setAnimated(true), 150);
         }
     };
 
@@ -64,48 +73,43 @@ const GitHubAnalyticsPage = () => {
         fetchData();
     }, []);
 
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => { if (entry.isIntersecting) setAnimated(true); },
-            { threshold: 0.3 }
-        );
-        if (chartRef.current) observer.observe(chartRef.current);
-        return () => observer.disconnect();
-    }, []);
+    // Build continuous 30-day series ending today
+    const fullTrend = React.useMemo(() => {
+        const trendMap = {};
+        if (Array.isArray(trend)) {
+            trend.forEach(t => {
+                if (t && t.date) {
+                    const key = String(t.date).split('T')[0];
+                    trendMap[key] = Number(t.commits) || 0;
+                }
+            });
+        }
+        const days = [];
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-    if (loading) {
-        return (
-            <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">
-                <div className="max-w-7xl mx-auto">
-                    <TopNavbar title="GitHub Analytics" subtitle="Your GitHub development activity and health metrics" />
-                    <div className="flex items-center justify-center h-64">
-                        <div className="text-center">
-                            <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-                            <p className="text-sm text-slate-500 font-medium">Loading GitHub analytics...</p>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        );
-    }
+        for (let i = 29; i >= 0; i--) {
+            const d = new Date(today);
+            d.setDate(d.getDate() - i);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const dateStr = `${yyyy}-${mm}-${dd}`;
+            const shortLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    if (error) {
-        return (
-            <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">
-                <div className="max-w-7xl mx-auto">
-                    <TopNavbar title="GitHub Analytics" subtitle="Your GitHub development activity and health metrics" />
-                    <div className="flex items-center justify-center h-64">
-                        <div className="text-center">
-                            <p className="text-sm text-rose-500 font-semibold">{error}</p>
-                            <button onClick={fetchData} className="mt-3 px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer">Retry</button>
-                        </div>
-                    </div>
-                </div>
-            </main>
-        );
-    }
+            days.push({
+                date: dateStr,
+                label: shortLabel,
+                commits: trendMap[dateStr] || 0
+            });
+        }
+        return days;
+    }, [trend]);
 
-    const maxTrendCommits = Math.max(...trend.map(t => t.commits), 1);
+    const maxTrendCommits = React.useMemo(() => {
+        const max = Math.max(...fullTrend.map(t => t.commits), 0);
+        return max > 0 ? max : 1;
+    }, [fullTrend]);
 
     return (
         <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">
@@ -193,29 +197,74 @@ const GitHubAnalyticsPage = () => {
                     </div>
                 )}
 
+                {/* 12-Month Contribution Calendar Heatmap */}
+                <ContributionHeatmap
+                    activity={activity}
+                    title="GitHub Contribution Calendar"
+                    subtitle="Commit activity across the last 12 months"
+                    platform="github"
+                    unit="commit"
+                    onSync={handleSync}
+                    syncing={syncing}
+                />
+
                 {/* Commit Trend Chart */}
-                {trend.length > 0 && (
-                    <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]" ref={chartRef}>
-                        <h3 className="font-bold text-slate-800 text-sm mb-4">Commit Trend (Last 30 Days)</h3>
-                        <div className="flex items-end gap-1 h-40">
-                            {trend.map((item, idx) => {
-                                const barHeight = animated && item.commits > 0 ? (item.commits / maxTrendCommits) * 100 : 0;
-                                return (
-                                    <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full group" title={`${item.date}: ${item.commits} commits`}>
-                                        <div className="text-[9px] text-slate-400 mb-1 opacity-0 group-hover:opacity-100 transition-opacity font-semibold">{item.commits}</div>
+                <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)]" ref={chartRef}>
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-slate-800 text-sm">Commit Trend (Last 30 Days)</h3>
+                        <span className="text-xs text-slate-500 font-medium">
+                            Peak: <strong className="text-slate-800">{maxTrendCommits} commits/day</strong>
+                        </span>
+                    </div>
+
+                    <div className="flex items-end gap-1.5 h-44 pt-6 pb-2 border-b border-slate-100">
+                        {fullTrend.map((item, idx) => {
+                            const barHeight = animated && item.commits > 0
+                                ? Math.max(15, (item.commits / maxTrendCommits) * 100)
+                                : 0;
+
+                            return (
+                                <div
+                                    key={idx}
+                                    className="flex-1 flex flex-col items-center justify-end h-full group relative cursor-pointer"
+                                >
+                                    {/* Tooltip on hover */}
+                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-medium px-2 py-1 rounded shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap">
+                                        <span className="font-bold text-emerald-400">{item.commits} commits</span>
+                                        <span className="text-slate-300 ml-1">({item.label})</span>
+                                    </div>
+
+                                    {/* Commit number badge for active days */}
+                                    {item.commits > 0 && (
+                                        <span className="text-[10px] text-slate-500 mb-1 font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                            {item.commits}
+                                        </span>
+                                    )}
+
+                                    {/* Bar element or baseline indicator */}
+                                    {item.commits > 0 ? (
                                         <div
                                             style={{
                                                 height: `${barHeight}%`,
-                                                transition: `height 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) ${idx * 0.03}s`
+                                                transition: `height 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) ${idx * 0.02}s`
                                             }}
-                                            className="w-full max-w-[14px] rounded-t-md bg-gradient-to-t from-blue-500 to-indigo-400 group-hover:from-blue-600 group-hover:to-indigo-500 shadow-sm transition-[transform,box-shadow] duration-200"
+                                            className="w-full max-w-[14px] rounded-t-md bg-gradient-to-t from-blue-600 via-indigo-500 to-indigo-400 group-hover:from-blue-700 group-hover:to-indigo-600 shadow-sm transition-[transform,box-shadow] duration-200 group-hover:scale-110"
                                         />
-                                    </div>
-                                );
-                            })}
-                        </div>
+                                    ) : (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-slate-200 group-hover:bg-slate-400 transition-colors mb-0.5" />
+                                    )}
+                                </div>
+                            );
+                        })}
                     </div>
-                )}
+
+                    {/* Timeline labels below chart */}
+                    <div className="flex justify-between text-[10px] font-medium text-slate-400 mt-2 px-1">
+                        <span>{fullTrend[0]?.label || '30 days ago'}</span>
+                        <span>{fullTrend[14]?.label || '15 days ago'}</span>
+                        <span>{fullTrend[fullTrend.length - 1]?.label || 'Today'}</span>
+                    </div>
+                </div>
             </div>
         </main>
     );

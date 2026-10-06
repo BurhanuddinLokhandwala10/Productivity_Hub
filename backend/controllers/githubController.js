@@ -1,4 +1,4 @@
-const { getGithubCommitStats, getGithubCommitTrend } = require("../repositories/githubRepository");
+const { getGithubCommitStats, getGithubCommitTrend, getGithubDailyActivity } = require("../repositories/githubRepository");
 const {
     getGithubHealthScore: getGithubHealthScoreService
 } = require("../services/developerAnalyticsService");
@@ -49,4 +49,26 @@ const getGithubCommitTrendController = async (req, res) => {
     }
 };
 
-module.exports = { getGithubHealthScore, getGithubCommitStatsController, getGithubCommitTrendController };
+const getGithubDailyActivityController = async (req, res) => {
+    try {
+        const activity = await getGithubDailyActivity(req.userId);
+
+        res.status(200).json({
+            message: "GitHub Daily Activity Fetched Successfully",
+            activity
+        });
+    } catch (error) {
+        console.error("GitHub Daily Activity Error:", error);
+        res.status(500).json({
+            message: "Failed to fetch GitHub daily activity",
+            error: error.message
+        });
+    }
+};
+
+module.exports = {
+    getGithubHealthScore,
+    getGithubCommitStatsController,
+    getGithubCommitTrendController,
+    getGithubDailyActivityController
+};

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import TopNavbar from '../TopNavbar.jsx';
+import ContributionHeatmap from '../common/ContributionHeatmap.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
@@ -9,6 +10,7 @@ const LeetCodeAnalyticsPage = () => {
     const [syncing, setSyncing] = useState(false);
     const [progress, setProgress] = useState(null);
     const [latestSnapshot, setLatestSnapshot] = useState(null);
+    const [activity, setActivity] = useState([]);
 
     const token = localStorage.getItem('Token');
 
@@ -16,9 +18,10 @@ const LeetCodeAnalyticsPage = () => {
         setLoading(true);
         setError('');
         try {
-            const [progressRes, summaryRes] = await Promise.all([
+            const [progressRes, summaryRes, activityRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/leetcode/progress`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/productivity/summary`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(`${API_BASE_URL}/leetcode/activity`, { headers: { Authorization: `Bearer ${token}` } }),
             ]);
 
             if (progressRes.ok) {
@@ -28,6 +31,10 @@ const LeetCodeAnalyticsPage = () => {
             if (summaryRes.ok) {
                 const d = await summaryRes.json();
                 setLatestSnapshot(d.summary?.leetcode || null);
+            }
+            if (activityRes.ok) {
+                const d = await activityRes.json();
+                setActivity(d.activity || []);
             }
         } catch (e) {
             setError('Unable to load LeetCode analytics.');
@@ -127,6 +134,17 @@ const LeetCodeAnalyticsPage = () => {
                         ))}
                     </div>
                 </div>
+
+                {/* 12-Month Submission Calendar Heatmap */}
+                <ContributionHeatmap
+                    activity={activity}
+                    title="LeetCode Submission Calendar"
+                    subtitle="Problem submissions across the last 12 months"
+                    platform="leetcode"
+                    unit="submission"
+                    onSync={handleSync}
+                    syncing={syncing}
+                />
 
                 {/* Progress Changes */}
                 {hasProgress && (

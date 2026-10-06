@@ -75,10 +75,17 @@ const LeetcodeAnalyticsCard = ({ stats = {} }) => {
 
             {/* Progress Distribution Footer */}
             <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs" ref={chartRef}>
-                <span className="text-slate-500 font-medium">Difficulty Spread:</span>
-                <span className="text-slate-700 font-semibold">
-                    {easy}E / {medium}M / {hard}H
-                </span>
+                <div className="flex items-center gap-1.5">
+                    <span className="text-slate-500 font-medium">Difficulty:</span>
+                    <span className="text-slate-700 font-semibold">{easy}E / {medium}M / {hard}H</span>
+                </div>
+                <button
+                    onClick={() => navigate('/dashboard/leetcode')}
+                    className="text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                    Heatmap <span>&rarr;</span>
+                </button>
             </div>
         </div>
     );

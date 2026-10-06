@@ -55,7 +55,7 @@ const DashboardHome = () => {
         }
 
         try {
-            // Fetch live data from backend PostgreSQL-backed APIs
+            // Fetch live data from backend (API Calling)
             const [ghRes, lcRes, dsaRes, aiRes] = await Promise.allSettled([
                 fetch(`${API_BASE_URL}/github/progress`, { headers: { Authorization: `Bearer ${token}` } }),
                 fetch(`${API_BASE_URL}/leetcode/progress`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -68,6 +68,7 @@ const DashboardHome = () => {
             // GitHub Live Data
             if (ghRes.status === 'fulfilled' && ghRes.value.ok) {
                 const ghData = await ghRes.value.json();
+                console.log("Ghdata - ", ghData)
                 if (ghData && ghData.score !== undefined) {
                     nextData.githubScore = ghData.score;
                     nextData.githubTrend = ghData.trend || 'STABLE';
@@ -167,6 +168,9 @@ const DashboardHome = () => {
             </main>
         );
     }
+
+    // console.log("Github - ", data.githubStats);
+    
 
     return (
         <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">

@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
  * GithubAnalyticsCard displaying live stats and commit velocity
  */
 const GithubAnalyticsCard = ({ stats = {} }) => {
+    // console.log("stats", stats);
+    
     const navigate = useNavigate();
     const [animated, setAnimated] = useState(false);
     const chartRef = useRef(null);
@@ -96,8 +98,17 @@ const GithubAnalyticsCard = ({ stats = {} }) => {
 
             {/* Mini Commit Activity Summary */}
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs" ref={chartRef}>
-                <span className="text-slate-500 font-medium">Trend Score:</span>
-                <span className="font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded-lg">{trendScore}/100</span>
+                <div className="flex items-center gap-2">
+                    <span className="text-slate-500 font-medium">Trend Score:</span>
+                    <span className="font-bold text-slate-900 px-2 py-0.5 bg-slate-100 rounded-lg">{trendScore}/100</span>
+                </div>
+                <button
+                    onClick={() => navigate('/dashboard/github')}
+                    className="text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                    Heatmap <span>&rarr;</span>
+                </button>
             </div>
         </div>
     );
