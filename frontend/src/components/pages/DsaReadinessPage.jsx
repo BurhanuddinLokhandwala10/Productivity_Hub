@@ -11,6 +11,7 @@ const DsaReadinessPage = () => {
     const [analytics, setAnalytics] = useState(null);
     const [updatingId, setUpdatingId] = useState(null);
     const [successMsg, setSuccessMsg] = useState('');
+
     const [filterOptions, setFilterOptions] = useState({
         topics: [],
         difficulties: ['Easy', 'Medium', 'Hard'],
@@ -28,12 +29,13 @@ const DsaReadinessPage = () => {
 
     const fetchQuestionsAndProgress = useCallback(async () => {
         try {
-            const params = new URLSearchParams();
+            const params = new URLSearchParams(); //Create an empty container where we can store URL parameters like filters.
             if (filterTopic) params.append('topic', filterTopic);
             if (filterDifficulty) params.append('difficulty', filterDifficulty);
             if (filterRelevance) params.append('relevance', filterRelevance);
             if (filterStatus) params.append('status', filterStatus);
 
+            
             const queryString = params.toString() ? `?${params.toString()}` : '';
             const res = await fetch(`${API_BASE_URL}/dsa/progress${queryString}`, {
                 headers: { Authorization: `Bearer ${token}` }
@@ -41,6 +43,7 @@ const DsaReadinessPage = () => {
 
             if (res.ok) {
                 const data = await res.json();
+
                 setQuestions(data.progress || []);
                 if (data.filterOptions) {
                     setFilterOptions(prev => ({
@@ -54,6 +57,8 @@ const DsaReadinessPage = () => {
         }
     }, [token, filterTopic, filterDifficulty, filterRelevance, filterStatus]);
 
+
+    // Complete Analysis Part
     const fetchReadinessAndAnalytics = useCallback(async () => {
         try {
             const [readinessRes, analyticsRes] = await Promise.all([
@@ -74,6 +79,7 @@ const DsaReadinessPage = () => {
         }
     }, [token]);
 
+    // useCallback tells React: "Remember this function and don't create a new version of it unless something it depends on changes."
     const fetchAll = useCallback(async () => {
         setLoading(true);
         setError('');
@@ -92,6 +98,8 @@ const DsaReadinessPage = () => {
     useEffect(() => {
         fetchAll();
     }, [fetchAll]);
+    // fetchAll() = execute the function.
+    // [fetchAll] = tell React that the effect depends on this function. or simply we can say watch the function
 
     const handleStatusChange = async (questionId, newStatus) => {
         setUpdatingId(questionId);
@@ -416,11 +424,10 @@ const DsaReadinessPage = () => {
                                                                 key={s}
                                                                 disabled={isUpdating}
                                                                 onClick={() => handleStatusChange(q.question_id, s)}
-                                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all duration-150 cursor-pointer disabled:opacity-50 ${
-                                                                    isActive
+                                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-all duration-150 cursor-pointer disabled:opacity-50 ${isActive
                                                                         ? activeStatusColors[s]
                                                                         : statusColors[s]
-                                                                }`}
+                                                                    }`}
                                                             >
                                                                 {s === 'NOT_SOLVED' ? 'Not Solved' : s === 'ATTEMPTED' ? 'Attempted' : 'Solved'}
                                                             </button>
