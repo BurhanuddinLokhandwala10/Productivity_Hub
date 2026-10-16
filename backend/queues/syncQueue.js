@@ -10,8 +10,8 @@ const syncQueue = new Queue("platform-sync", {
             type: "exponential",
             delay: 5000
         },
-        removeOnComplete: 100,
-        removeOnFail: 100
+        removeOnComplete: 50,
+        removeOnFail: 50
     }
 });
 

@@ -79,7 +79,7 @@ const GitHubAnalyticsPage = () => {
         if (Array.isArray(trend)) {
             trend.forEach(t => {
                 if (t && t.date) {
-                    const key = String(t.date).split('T')[0];
+                    const key = String(t.date).split('T')[0]; // splitting it into two haves because it may contain the timezone            2026-10-03T00:00:00.000Z like this we only need the date
                     trendMap[key] = Number(t.commits) || 0;
                 }
             });
@@ -92,16 +92,16 @@ const GitHubAnalyticsPage = () => {
             const d = new Date(today);
             d.setDate(d.getDate() - i);
             const yyyy = d.getFullYear();
-            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0'); // getMonth() starts from 0 therefore added 1 to get correct mmonth number for october. padStart(2, '0') ensures: → "05"
             const dd = String(d.getDate()).padStart(2, '0');
             const dateStr = `${yyyy}-${mm}-${dd}`;
             const shortLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
             days.push({
                 date: dateStr,
                 label: shortLabel,
                 commits: trendMap[dateStr] || 0
             });
+            console.log("DATE - ", days)
         }
         return days;
     }, [trend]);
@@ -220,7 +220,7 @@ const GitHubAnalyticsPage = () => {
                     <div className="flex items-end gap-1.5 h-44 pt-6 pb-2 border-b border-slate-100">
                         {fullTrend.map((item, idx) => {
                             const barHeight = animated && item.commits > 0
-                                ? Math.max(15, (item.commits / maxTrendCommits) * 100)
+                                ? Math.max(15, (item.commits / maxTrendCommits) * 100) //-> This calculates the bar's height as a percentage.
                                 : 0;
 
                             return (

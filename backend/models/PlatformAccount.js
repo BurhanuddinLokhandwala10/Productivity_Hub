@@ -13,8 +13,20 @@ const PlatformAccountSchema = mongoose.Schema({
     username: {
         type: String,
         required: true
+    },
+    lastSyncedAt: {
+        type: Date,
+        default: null
+    },
+    syncStatus: {
+        type: String,
+        enum: ['IDLE', 'SYNCING', 'SUCCESS', 'ERROR'],
+        default: 'IDLE'
+    },
+    lastSyncError: {
+        type: String,
+        default: null
     }
-
 }, { timestamps: true });
 
 module.exports = mongoose.model("PlatformAccount", PlatformAccountSchema);

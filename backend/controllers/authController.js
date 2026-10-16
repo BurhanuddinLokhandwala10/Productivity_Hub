@@ -35,7 +35,6 @@ const SignUp = async (req, res) => {
     res.status(200).json({
         message: "User Created Successfully"
     })
-    console.log("User Created with username : ", username, "and email : ", email)
 }
 
 const Login = async (req, res) => {

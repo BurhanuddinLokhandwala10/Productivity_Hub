@@ -68,7 +68,6 @@ const DashboardHome = () => {
             // GitHub Live Data
             if (ghRes.status === 'fulfilled' && ghRes.value.ok) {
                 const ghData = await ghRes.value.json();
-                console.log("Ghdata - ", ghData)
                 if (ghData && ghData.score !== undefined) {
                     nextData.githubScore = ghData.score;
                     nextData.githubTrend = ghData.trend || 'STABLE';
@@ -134,9 +133,68 @@ const DashboardHome = () => {
         }
     }, []);
 
+    // Sync status and manual trigger state
+    const [syncAccounts, setSyncAccounts] = useState([]);
+    const [syncing, setSyncing] = useState(false);
+    const [syncMsg, setSyncMsg] = useState('');
+
+    const fetchSyncStatus = useCallback(async () => {
+        const token = localStorage.getItem('Token');
+        if (!token) return;
+        try {
+            const res = await fetch(`${API_BASE_URL}/platform/sync-status`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setSyncAccounts(data.accounts || []);
+            }
+        } catch {
+            // fail silently
+        }
+    }, []);
+
+    const handleSyncNow = async () => {
+        const token = localStorage.getItem('Token');
+        if (!token || syncing) return;
+        setSyncing(true);
+        setSyncMsg('Queuing synchronization jobs...');
+        try {
+            const res = await fetch(`${API_BASE_URL}/platform/sync-now`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+                setSyncMsg('Sync queued! Fetching latest data...');
+                // Give BullMQ worker a brief moment to process, then refresh
+                setTimeout(async () => {
+                    await Promise.all([fetchDashboardData(), fetchSyncStatus()]);
+                    setSyncing(false);
+                    setSyncMsg('Synchronized successfully!');
+                    setTimeout(() => setSyncMsg(''), 4000);
+                }, 2500);
+            } else {
+                setSyncing(false);
+                setSyncMsg('Failed to queue sync.');
+            }
+        } catch {
+            setSyncing(false);
+            setSyncMsg('Network error during sync.');
+        }
+    };
+
     useEffect(() => {
         fetchDashboardData();
-    }, [fetchDashboardData]);
+        fetchSyncStatus();
+
+        // Auto-refresh data every 45 seconds to capture background sync updates smoothly
+        const intervalId = setInterval(() => {
+            fetchDashboardData();
+            fetchSyncStatus();
+        }, 45000);
+
+        return () => clearInterval(intervalId);
+    }, [fetchDashboardData, fetchSyncStatus]);
 
     const handleGenerateAnalysis = async () => {
         const token = localStorage.getItem('Token');
@@ -169,8 +227,18 @@ const DashboardHome = () => {
         );
     }
 
-    // console.log("Github - ", data.githubStats);
-    
+    // Helper to calculate last sync label
+    const formatLastSync = (dateStr) => {
+        if (!dateStr) return 'Never';
+        const d = new Date(dateStr);
+        const diffMs = Date.now() - d.getTime();
+        const diffMins = Math.floor(diffMs / 60000);
+        if (diffMins < 1) return 'Just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        const diffHours = Math.floor(diffMins / 60);
+        if (diffHours < 24) return `${diffHours}h ago`;
+        return d.toLocaleDateString();
+    };
 
     return (
         <main className="flex-1 h-screen overflow-y-auto bg-[#f8faff] p-6 lg:p-8">
@@ -180,6 +248,50 @@ const DashboardHome = () => {
                     title="Overview"
                     subtitle="Live developer metrics, readiness tracking, and AI analysis"
                 />
+
+                {/* Sync Status Banner */}
+                <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                            <svg className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-800">Background Sync</span>
+                                {syncMsg && (
+                                    <span className="text-[11px] font-medium text-indigo-600 animate-pulse">{syncMsg}</span>
+                                )}
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
+                                {syncAccounts.length > 0 ? (
+                                    syncAccounts.map(acc => (
+                                        <span key={acc.platform} className="inline-flex items-center gap-1">
+                                            <span className="font-semibold text-slate-700 capitalize">{acc.platform}:</span>
+                                            <span>{acc.syncStatus === 'SYNCING' ? 'Syncing...' : formatLastSync(acc.lastSyncedAt)}</span>
+                                            {acc.syncStatus === 'ERROR' && (
+                                                <span className="text-rose-500 text-[10px]" title={acc.lastSyncError}>⚠️ error</span>
+                                            )}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span>Fast background sync active (every 5 min & webhook)</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={handleSyncNow}
+                        disabled={syncing}
+                        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer shadow-xs"
+                    >
+                        <svg className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span>{syncing ? 'Syncing...' : 'Sync Now'}</span>
+                    </button>
+                </div>
 
                 {/* Top 3 Score Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">

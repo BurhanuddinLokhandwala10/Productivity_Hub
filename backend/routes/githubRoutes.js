@@ -6,9 +6,11 @@ const {
     getGithubHealthScore,
     getGithubCommitStatsController,
     getGithubCommitTrendController,
-    getGithubDailyActivityController
+    getGithubDailyActivityController,
+    handleGithubWebhook
 } = require("../controllers/githubController");
 
+router.post('/webhook', handleGithubWebhook);
 router.get('/progress', Middleware, getGithubHealthScore);
 router.get('/stats', Middleware, getGithubCommitStatsController);
 router.get('/commit-trend', Middleware, getGithubCommitTrendController);

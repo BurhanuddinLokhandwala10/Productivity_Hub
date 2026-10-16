@@ -23,7 +23,6 @@ const platformRegister = async (req, res) => {
             username
         })
         await platformAccount.save();
-        console.log("Platform Account Created with username : ", username, "and platform : ", platform);
         res.status(200).json({
             message: "Platform Account Created Successfully",
             platformAccount
@@ -47,7 +46,6 @@ const getPlatformStats = async (req, res) => {
     }
 
     const username = account.username
-    console.log("PLATFORM:", platform)
     try {
         if (platform === "github") {
             // getting the user profile details and saving it to database
@@ -75,8 +73,19 @@ const getPlatformStats = async (req, res) => {
             const stats = await leetcodeAPICall(username);
 
             const saveStatus = await saveLeetcodeSnapshot(stats, req.userId);
-            // console.log("API CALL - ", saveStatus);
-            return res.status(200).json({ message: "Leetcode Stats Fetched Successfully", stats, saveStatus });
+            
+            let dsaSync = null;
+            if (stats?.recentAcSubmissions && stats.recentAcSubmissions.length > 0) {
+                const { syncLeetcodeAcceptedSubmissions } = require('../repositories/dsaRepository');
+                dsaSync = await syncLeetcodeAcceptedSubmissions(req.userId, stats.recentAcSubmissions);
+            }
+
+            return res.status(200).json({
+                message: "Leetcode Stats Fetched Successfully",
+                stats,
+                saveStatus,
+                dsaSync
+            });
         }
 
         return res.status(400).json({ message: "Invalid platform" });
@@ -85,4 +94,50 @@ const getPlatformStats = async (req, res) => {
     }
 }
 
-module.exports = { platformRegister, getPlatformStats }
+const triggerSyncNow = async (req, res) => {
+    try {
+        const accounts = await PlatformAccount.find({ userId: req.userId });
+        if (!accounts || accounts.length === 0) {
+            return res.status(404).json({ message: "No platform accounts registered for this user" });
+        }
+
+        const syncQueue = require('../queues/syncQueue');
+        const queued = [];
+
+        for (const account of accounts) {
+            const jobId = `${account.platform}-sync-${account.userId}-${Date.now()}`;
+            const job = await syncQueue.add(
+                `${account.platform}-sync`,
+                { userId: account.userId.toString() },
+                {
+                    jobId,
+                    attempts: 3,
+                    backoff: { type: "exponential", delay: 5000 }
+                }
+            );
+            queued.push({ platform: account.platform, jobId: job.id });
+        }
+
+        return res.status(200).json({
+            message: "Sync job(s) queued successfully",
+            queued
+        });
+    } catch (e) {
+        console.error("triggerSyncNow error:", e);
+        return res.status(500).json({ message: "Failed to queue sync jobs", error: `${e}` });
+    }
+};
+
+const getSyncStatus = async (req, res) => {
+    try {
+        const accounts = await PlatformAccount.find({ userId: req.userId }).select('platform username lastSyncedAt syncStatus lastSyncError');
+        return res.status(200).json({
+            accounts: accounts || []
+        });
+    } catch (e) {
+        console.error("getSyncStatus error:", e);
+        return res.status(500).json({ message: "Failed to fetch sync status", error: `${e}` });
+    }
+};
+
+module.exports = { platformRegister, getPlatformStats, triggerSyncNow, getSyncStatus };

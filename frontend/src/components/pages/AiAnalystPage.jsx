@@ -27,7 +27,10 @@ const AiAnalystPage = () => {
             }
 
             const data = await res.json();
+            console.log(data);
+            
             const result = data.data?.analysis || data.analysis || data;
+
             setAnalysis(result);
             if (data.analytics) setAnalytics(data.analytics);
         } catch (e) {

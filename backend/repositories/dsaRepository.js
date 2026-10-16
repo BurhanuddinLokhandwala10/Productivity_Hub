@@ -30,6 +30,7 @@ const findUserProgress = async (userId, filters = {}) => {
         SELECT
             q.id AS question_id,
             q.question,
+            q.leetcode_slug,
             q.difficulty,
             q.relevance,
             COALESCE(t.topic, 'General') AS topic,
@@ -219,13 +220,70 @@ const findDsaReadinessData = async (userId) => {
     };
 };
 
+// 8. Find question(s) by stable LeetCode slug
+const findQuestionBySlug = async (slug) => {
+    if (!slug) return [];
+    const result = await pool.query(
+        `SELECT id, question, difficulty, relevance, leetcode_slug FROM questions WHERE leetcode_slug = $1`,
+        [slug.trim()]
+    );
+    return result.rows;
+};
+
+// 9. Sync accepted submissions to DSA sheet
+const syncLeetcodeAcceptedSubmissions = async (userId, acceptedSubmissions) => {
+    if (!userId || !Array.isArray(acceptedSubmissions) || acceptedSubmissions.length === 0) {
+        return { updated: 0, matched: 0, matchedQuestions: [] };
+    }
+
+    const slugSet = new Set();
+    for (const sub of acceptedSubmissions) {
+        const s = (sub?.titleSlug || sub?.slug || '').trim();
+        if (s) {
+            slugSet.add(s);
+        }
+    }
+
+    const uniqueSlugs = Array.from(slugSet);
+    if (uniqueSlugs.length === 0) {
+        return { updated: 0, matched: 0, matchedQuestions: [] };
+    }
+
+    const matchRes = await pool.query(
+        `
+        SELECT id, question, difficulty, relevance, leetcode_slug 
+        FROM questions 
+        WHERE leetcode_slug = ANY($1::text[])
+        ORDER BY id ASC
+        `,
+        [uniqueSlugs]
+    );
+
+    const matchedQuestions = matchRes.rows;
+    if (matchedQuestions.length === 0) {
+        return { updated: 0, matched: 0, matchedQuestions: [] };
+    }
+
+    for (const q of matchedQuestions) {
+        await upsertUserProgress(userId, q.id, 'SOLVED');
+    }
+
+    return {
+        updated: matchedQuestions.length,
+        matched: matchedQuestions.length,
+        matchedQuestions
+    };
+};
+
 module.exports = {
     findQuestionById,
+    findQuestionBySlug,
     upsertUserProgress,
     findUserProgress,
     getDsaFilterOptions,
     findDsaAnalyticsData,
     upsertUserTarget,
     findUserTarget,
-    findDsaReadinessData
+    findDsaReadinessData,
+    syncLeetcodeAcceptedSubmissions
 };

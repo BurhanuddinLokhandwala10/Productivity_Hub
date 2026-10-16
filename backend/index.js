@@ -6,7 +6,9 @@ const express = require('express');
 // the environment variable hasn't been loaded yet.
 const dotenv = require('dotenv')
 dotenv.config();
-
+require("./config/redis");
+require("./workers/syncWorker");
+require("./queues/syncScheduler");
 const { connectDB, pool } = require('./config/db')
 const cors = require('cors');
 const authRoutes = require('./routes/authRoutes')
@@ -35,8 +37,12 @@ pool.query("SELECT NOW()", (err, result) => {
     }
 });
 
-// Middleware to parse JSON bodies
-app.use(express.json())
+// Middleware to parse JSON bodies (preserves rawBody for webhook HMAC verification)
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf;
+    }
+}));
 
 // CORS Configuration
 const corsOptions = {

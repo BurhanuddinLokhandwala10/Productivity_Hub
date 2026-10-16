@@ -63,16 +63,11 @@ const DsaReadinessPage = () => {
         try {
             const [readinessRes, analyticsRes] = await Promise.all([
                 fetch(`${API_BASE_URL}/dsa/readiness`, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API_BASE_URL}/dsa/analytics`, { headers: { Authorization: `Bearer ${token}` } }),
             ]);
 
             if (readinessRes.ok) {
                 const d = await readinessRes.json();
                 setReadiness(d);
-            }
-            if (analyticsRes.ok) {
-                const d = await analyticsRes.json();
-                setAnalytics(d);
             }
         } catch (e) {
             console.error('Failed to load DSA analytics:', e);
@@ -97,6 +92,10 @@ const DsaReadinessPage = () => {
 
     useEffect(() => {
         fetchAll();
+        const intervalId = setInterval(() => {
+            fetchAll();
+        }, 45000);
+        return () => clearInterval(intervalId);
     }, [fetchAll]);
     // fetchAll() = execute the function.
     // [fetchAll] = tell React that the effect depends on this function. or simply we can say watch the function
@@ -122,7 +121,7 @@ const DsaReadinessPage = () => {
                             ? { ...q, status: newStatus }
                             : q
                     )
-                );
+                );  
                 setSuccessMsg(`Status updated: ${newStatus}`);
                 setTimeout(() => setSuccessMsg(''), 2500);
 
@@ -224,7 +223,7 @@ const DsaReadinessPage = () => {
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
                             <div>
                                 <h3 className="text-base font-bold text-slate-900">Readiness Overview</h3>
-                                <p className="text-xs text-slate-500">Live score based on your personal progress across {analytics?.totalQuestions || 317} questions</p>
+                                <p className="text-xs text-slate-500">Live score based on your personal progress across {analytics?.totalQuestions || 317} questions</p>    
                             </div>
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-semibold text-slate-600">Target Type:</span>
@@ -235,21 +234,26 @@ const DsaReadinessPage = () => {
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                            {/* Readiness Score Div */}
                             <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-4 text-center">
                                 <div className="text-2xl font-black text-indigo-900">{readiness.readinessScore}%</div>
                                 <div className="text-[11px] font-medium text-slate-500 mt-1">Readiness Score</div>
                                 <div className="text-[10px] text-indigo-600 font-bold mt-0.5">{readiness.label}</div>
                             </div>
+                            {/* Must Solved Div */}
                             <div className="bg-red-50/70 border border-red-100 rounded-xl p-4 text-center">
                                 <div className="text-2xl font-black text-red-900">{readiness.must?.solved || 0}/{readiness.must?.total || 0}</div>
                                 <div className="text-[11px] font-medium text-slate-500 mt-1">MUST Done</div>
                                 <div className="text-[10px] text-red-600 font-bold mt-0.5">{readiness.must?.percentage || 0}%</div>
                             </div>
+                            {/* High Solved Div */}
                             <div className="bg-orange-50/70 border border-orange-100 rounded-xl p-4 text-center">
                                 <div className="text-2xl font-black text-orange-900">{readiness.high?.solved || 0}/{readiness.high?.total || 0}</div>
                                 <div className="text-[11px] font-medium text-slate-500 mt-1">HIGH Done</div>
                                 <div className="text-[10px] text-orange-600 font-bold mt-0.5">{readiness.high?.percentage || 0}%</div>
                             </div>
+
+                            {/* Difficulty Wise Solved Div */}
                             {(readiness.difficulty || []).map((d, idx) => (
                                 <div key={idx} className="bg-slate-50/70 border border-slate-100 rounded-xl p-4 text-center">
                                     <div className="text-2xl font-black text-slate-900">{d.solved}/{d.total}</div>
@@ -395,7 +399,7 @@ const DsaReadinessPage = () => {
                                     const currentStatus = q.status || 'NOT_SOLVED';
                                     const isUpdating = updatingId === q.question_id;
                                     return (
-                                        <tr key={q.question_id} className="hover:bg-indigo-50/30 transition-colors">
+                                        <tr key={idx} className="hover:bg-indigo-50/30 transition-colors">
                                             <td className="px-4 py-3 text-xs text-slate-400 font-mono">{idx + 1}</td>
                                             <td className="px-4 py-3">
                                                 <span className="text-xs font-semibold text-slate-900 block">{q.question}</span>
