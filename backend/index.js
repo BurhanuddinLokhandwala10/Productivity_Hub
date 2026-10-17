@@ -45,14 +45,18 @@ app.use(express.json({
 }));
 
 // CORS Configuration
-const corsOptions = {
-    origin: 'http://localhost:5173',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-};
 
-app.use(cors(corsOptions));
+const cors = require("cors");
+
+const allowedOrigins = [
+    "http://localhost:5173",
+    "https://productivity-hub-bay.vercel.app"
+];
+
+app.use(cors({
+    origin: allowedOrigins,
+    credentials: true
+}));
 
 app.get('/', (req, res) => {
     res.status(200).json({
