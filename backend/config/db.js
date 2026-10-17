@@ -10,13 +10,20 @@ async function connectDB() {
     }
 }
 
-const pool = new Pool({
-    user: "postgres",
-    host: "localhost",
-    database: "Dev_Productivity_Hub",
-    password: process.env.POSTGRES_PASSWORD,
-    port: 5432,
-});
+const pool = new Pool(
+    process.env.DATABASE_URL
+        ? {
+            connectionString: process.env.DATABASE_URL,
+            ssl: { rejectUnauthorized: false },
+        }
+        : {
+            user: "postgres",
+            host: "localhost",
+            database: "Dev_Productivity_Hub",
+            password: process.env.POSTGRES_PASSWORD,
+            port: 5432,
+        }
+);
 
 pool.on("connect", () => {
     console.log("PostgreSQL connected");

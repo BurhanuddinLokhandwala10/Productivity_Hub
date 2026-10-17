@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import TopNavbar from '../TopNavbar.jsx';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+console.log("URL - ", API_BASE_URL);
 
 const AiAnalystPage = () => {
     const [loading, setLoading] = useState(true);
