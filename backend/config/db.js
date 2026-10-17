@@ -3,10 +3,11 @@ const { Pool } = require("pg");
 
 async function connectDB() {
     try {
-        await mongoose.connect(process.env.MONGO_URI)
-        console.log("DB CONNECTED")
+        await mongoose.connect(process.env.MONGO_URI);
+        console.log("DB CONNECTED");
     } catch (e) {
-        console.log("Something went wrong :", e)
+        console.error("MongoDB connection failed:", e.message);
+        throw e;
     }
 }
 
