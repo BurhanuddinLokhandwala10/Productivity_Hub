@@ -4,14 +4,12 @@ const redis = new Redis(process.env.REDIS_URL, {
     maxRetriesPerRequest: null
 });
 
-module.exports = redis;
-
 redis.on("connect", () => {
     console.log("Redis Connected Successfully");
 });
 
 redis.on("error", (err) => {
-    console.error("Redis Error:", err);
+    console.error("Redis Error:", err.message);
 });
 
 module.exports = redis;
