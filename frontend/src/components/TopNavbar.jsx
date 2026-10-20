@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const TopNavbar = ({ title = "Overview", subtitle = "Your complete developer productivity snapshot" }) => {
     const navigate = useNavigate();
     const [userName, setUserName] = useState('');
@@ -13,7 +15,7 @@ const TopNavbar = ({ title = "Overview", subtitle = "Your complete developer pro
     useEffect(() => {
         async function getUserDetails() {
             try {
-                const response = await fetch('http://localhost:3000/auth/protected-test', {
+                const response = await fetch(`${API_BASE_URL}/auth/protected-test`, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',

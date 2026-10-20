@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import bgImage from "../assets/Login_Signup_Bg.png";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const SignUp = () => {
     const navigate = useNavigate();
     const [formData, setFormData] = useState({
