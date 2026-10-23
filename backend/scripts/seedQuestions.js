@@ -105,4 +105,13 @@ async function seedQuestions() {
     console.log("Questions and topics seeded successfully");
 }
 
-seedQuestions();
+seedQuestions()
+    .then(() => {
+        console.log("Questions and topics seeded successfully");
+        return pool.end();
+    })
+    .catch(async (error) => {
+        console.error("Seeding failed:", error);
+        await pool.end();
+        process.exitCode = 1;
+    });
