@@ -123,13 +123,47 @@ CREATE TABLE IF NOT EXISTS leetcode_daily_activity (
 CREATE INDEX IF NOT EXISTS idx_leetcode_daily_activity_user_id ON leetcode_daily_activity(user_id);
 `;
 
+const { generateSlug, SLUG_OVERRIDES } = require('../utils/slugUtils');
+
 /**
  * Runs the schema migration against the provided pool.
+ * Also automatically ensures questions have canonical leetcode_slug populated.
  * @param {import('pg').Pool} pool - PostgreSQL connection pool
  * @returns {Promise<void>}
  */
 async function initializeSchema(pool) {
     await pool.query(migrationSQL);
+
+    try {
+        // Ensure all questions have leetcode_slug populated
+        const missingRes = await pool.query(
+            `SELECT id, question FROM questions WHERE leetcode_slug IS NULL OR TRIM(leetcode_slug) = ''`
+        );
+
+        if (missingRes.rows.length > 0) {
+            console.log(`[schema] Backfilling leetcode_slug for ${missingRes.rows.length} questions...`);
+            for (const row of missingRes.rows) {
+                const slug = generateSlug(row.question);
+                if (slug) {
+                    await pool.query(
+                        `UPDATE questions SET leetcode_slug = $1 WHERE id = $2`,
+                        [slug, row.id]
+                    );
+                }
+            }
+            console.log(`[schema] Backfilled leetcode_slug for ${missingRes.rows.length} questions.`);
+        }
+
+        // Apply any specific overrides where question titles are ambiguous
+        for (const [questionTitle, canonicalSlug] of Object.entries(SLUG_OVERRIDES)) {
+            await pool.query(
+                `UPDATE questions SET leetcode_slug = $1 WHERE question = $2 AND (leetcode_slug IS NULL OR leetcode_slug != $1)`,
+                [canonicalSlug, questionTitle]
+            );
+        }
+    } catch (err) {
+        console.error("[schema] Warning: Failed to backfill question slugs:", err.message);
+    }
 }
 
 module.exports = { initializeSchema };

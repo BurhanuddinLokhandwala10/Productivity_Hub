@@ -16,18 +16,24 @@ const platformRegister = async (req, res) => {
         })
         return;
     }
+
+    // Normalize platform to lowercase for consistent lookups
+    const normalizedPlatform = platform.toLowerCase().trim();
+
     try {
-        const platformAccount = new PlatformAccount({
-            userId: req.userId,
-            platform,
-            username
-        })
-        await platformAccount.save();
+        // Upsert: update username if account already exists, otherwise create
+        const platformAccount = await PlatformAccount.findOneAndUpdate(
+            { userId: req.userId, platform: normalizedPlatform },
+            { username: username.trim() },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        console.log(`[platformRegister] Platform account upserted: userId=${req.userId}, platform=${normalizedPlatform}, username=${username.trim()}`);
         res.status(200).json({
             message: "Platform Account Created Successfully",
             platformAccount
         })
     } catch (e) {
+        console.error(`[platformRegister] Failed for userId=${req.userId}, platform=${normalizedPlatform}:`, e.message);
         res.status(500).json({
             message: `Failed to Create Platform Account due to : ${e}`
         })
@@ -36,7 +42,7 @@ const platformRegister = async (req, res) => {
 
 
 const getPlatformStats = async (req, res) => {
-    const { platform } = req.query;
+    const platform = (req.query.platform || '').toLowerCase().trim();
     const account = await PlatformAccount.findOne({ userId: req.userId, platform })
     if (!account) {
         res.status(404).json({
@@ -84,7 +90,8 @@ const getPlatformStats = async (req, res) => {
                 message: "Leetcode Stats Fetched Successfully",
                 stats,
                 saveStatus,
-                dsaSync
+                dsaSync,
+                dsaReadiness: dsaSync?.readiness || null
             });
         }
 

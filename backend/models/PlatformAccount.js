@@ -8,7 +8,8 @@ const PlatformAccountSchema = mongoose.Schema({
     },
     platform: {
         type: String,
-        required: true
+        required: true,
+        set: (v) => (typeof v === 'string' ? v.toLowerCase().trim() : v)
     },
     username: {
         type: String,
@@ -28,5 +29,8 @@ const PlatformAccountSchema = mongoose.Schema({
         default: null
     }
 }, { timestamps: true });
+
+// Prevent duplicate platform accounts per user
+PlatformAccountSchema.index({ userId: 1, platform: 1 }, { unique: true });
 
 module.exports = mongoose.model("PlatformAccount", PlatformAccountSchema);

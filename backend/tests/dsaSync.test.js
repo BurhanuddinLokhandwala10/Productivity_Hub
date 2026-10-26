@@ -223,4 +223,90 @@ describe('Feature 1: DSA Sheet Synchronization with LeetCode Submissions', () =>
             assert.equal(res.rows[0]?.status, 'SOLVED');
         }
     });
+
+    it('8. Full flow: accepted LeetCode submission -> correct DSA question matched -> progress saved -> readiness recalculated -> updated value returned', async () => {
+        const { getDsaReadiness } = require('../services/developerAnalyticsService');
+
+        // Clean user progress for this specific test
+        await pool.query('DELETE FROM user_question_progress WHERE user_id = $1', [testUserId]);
+
+        // 1. Initial readiness before any solutions
+        const initialReadiness = await getDsaReadiness(testUserId);
+        assert.equal(initialReadiness.must.solved, 0, 'Initially 0 must solved');
+        assert.equal(initialReadiness.readinessScore, 0, 'Initially readiness score is 0');
+
+        // 2. Simulate newly accepted LeetCode submissions
+        const submissions = [
+            {
+                id: '10001',
+                title: 'Two Sum',
+                titleSlug: 'two-sum',
+                timestamp: '1700000000'
+            },
+            {
+                id: '10002',
+                title: 'Move Zeroes',
+                titleSlug: 'move-zeroes',
+                timestamp: '1700000010'
+            },
+            {
+                id: '10003',
+                title: 'Binary Tree Level Order Traversal',
+                titleSlug: 'binary-tree-level-order-traversal',
+                timestamp: '1700000020'
+            }
+        ];
+
+        // 3. Sync submissions
+        const syncResult = await syncLeetcodeAcceptedSubmissions(testUserId, submissions);
+
+        // 4. Verify matched questions
+        assert.ok(syncResult.matched >= 3, `Expected at least 3 matches, got ${syncResult.matched}`);
+        const matchedSlugs = syncResult.matchedQuestions.map(q => q.leetcode_slug);
+        assert.ok(matchedSlugs.includes('two-sum'), 'Should match Two Sum');
+        assert.ok(matchedSlugs.includes('move-zeroes'), 'Should match Move Zeroes');
+        assert.ok(matchedSlugs.includes('binary-tree-level-order-traversal'), 'Should match Level Order Traversal via canonical slug');
+
+        // 5. Verify progress saved in database
+        const savedProgress = await pool.query(
+            "SELECT question_id, status FROM user_question_progress WHERE user_id = $1 AND status = 'SOLVED'",
+            [testUserId]
+        );
+        assert.ok(savedProgress.rows.length >= 3, 'Progress records must be saved in database');
+
+        // 6. Verify readiness is recalculated and increased
+        assert.ok(syncResult.readiness, 'syncResult must include recalculated readiness');
+        assert.ok(syncResult.readiness.readinessScore > 0, `Readiness score must be > 0, got ${syncResult.readiness.readinessScore}`);
+        assert.ok(syncResult.readiness.must.solved > 0, 'Must solved must be > 0');
+
+        // 7. Verify consistency with direct readiness calculation
+        const directReadiness = await getDsaReadiness(testUserId);
+        assert.equal(directReadiness.readinessScore, syncResult.readiness.readinessScore);
+        assert.equal(directReadiness.must.solved, syncResult.readiness.must.solved);
+    });
+
+    it('9. Resolves canonical overrides for questions with annotated or abbreviated sheet titles', async () => {
+        // Test questions that previously failed matching
+        const overrideSubmissions = [
+            {
+                id: '10004',
+                title: 'Maximum Subarray',
+                titleSlug: 'maximum-subarray',
+                timestamp: '1700000030'
+            },
+            {
+                id: '10005',
+                title: 'Kth Largest Element in an Array',
+                titleSlug: 'kth-largest-element-in-an-array',
+                timestamp: '1700000040'
+            }
+        ];
+
+        const syncResult = await syncLeetcodeAcceptedSubmissions(testUserId, overrideSubmissions);
+        assert.ok(syncResult.matched >= 2, 'Must match questions with overrides');
+        const matchedQuestions = syncResult.matchedQuestions;
+        assert.ok(matchedQuestions.some(q => q.leetcode_slug === 'maximum-subarray'), 'Maximum Subarray (Kadane) matched');
+        assert.ok(matchedQuestions.some(q => q.leetcode_slug === 'kth-largest-element-in-an-array'), 'Kth Largest matched');
+    });
 });
+

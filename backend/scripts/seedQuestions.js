@@ -3,6 +3,7 @@ dotenv.config();
 
 const XLSX = require("xlsx");
 const { pool } = require("../config/db");
+const { generateSlug } = require("../utils/slugUtils");
 
 // reads the excel sheet, since may the excel sheet content amny sheet inside it so therefore we calll it as workbook - collection of sheets
 const workbook = XLSX.readFile("DSA_BIBLE.xlsx");
@@ -40,17 +41,21 @@ async function seedQuestions() {
             row.DIFFICULTY === "Hard"
         ) {
 
+            const slug = generateSlug(problem);
+
             // Insert question
             await pool.query(
                 `
-                INSERT INTO questions (question, difficulty, relevance)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (question) DO NOTHING
+                INSERT INTO questions (question, difficulty, relevance, leetcode_slug)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (question) DO UPDATE
+                SET leetcode_slug = COALESCE(questions.leetcode_slug, EXCLUDED.leetcode_slug)
                 `,
                 [
                     problem,
                     row.DIFFICULTY,
-                    row["INTERVIEW RELEVANCE"]
+                    row["INTERVIEW RELEVANCE"],
+                    slug
                 ]
             );
 

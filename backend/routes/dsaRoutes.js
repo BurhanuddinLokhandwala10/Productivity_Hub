@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
-const { updateProgress, getProgress, getAnalytics, updateTarget, getTarget, getReadiness } = require('../controllers/dsaController')
+const { updateProgress, getProgress, getAnalytics, updateTarget, getTarget, getReadiness, syncLeetcode } = require('../controllers/dsaController');
 
 // Apply middleware to all DSA routes
 router.use(authMiddleware);
@@ -14,5 +14,6 @@ router.get("/analytics", getAnalytics);
 router.post("/target", updateTarget);
 router.get("/target", getTarget);
 router.get("/readiness", getReadiness);
+router.post("/sync", syncLeetcode);
 
-module.exports = router;
+module.exports = router;

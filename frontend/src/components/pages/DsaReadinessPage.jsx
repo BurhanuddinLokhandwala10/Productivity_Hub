@@ -11,6 +11,7 @@ const DsaReadinessPage = () => {
     const [analytics, setAnalytics] = useState(null);
     const [updatingId, setUpdatingId] = useState(null);
     const [successMsg, setSuccessMsg] = useState('');
+    const [syncing, setSyncing] = useState(false);
 
     const [filterOptions, setFilterOptions] = useState({
         topics: [],
@@ -138,6 +139,34 @@ const DsaReadinessPage = () => {
         }
     };
 
+    const handleSyncLeetcode = async () => {
+        setSyncing(true);
+        setSuccessMsg('');
+        try {
+            const res = await fetch(`${API_BASE_URL}/dsa/sync`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (data.readiness) {
+                    setReadiness(data.readiness);
+                }
+                const matchedCount = data.sync?.matched || 0;
+                setSuccessMsg(`LeetCode synced: ${matchedCount} question(s) matched and updated!`);
+                setTimeout(() => setSuccessMsg(''), 3500);
+                await fetchAll();
+            } else {
+                alert(data.message || 'Failed to sync with LeetCode');
+            }
+        } catch (e) {
+            console.error('Failed to sync LeetCode:', e);
+            alert('Error syncing with LeetCode');
+        } finally {
+            setSyncing(false);
+        }
+    };
+
     const statusColors = {
         NOT_SOLVED: 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200/70',
         ATTEMPTED: 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
@@ -225,11 +254,24 @@ const DsaReadinessPage = () => {
                                 <h3 className="text-base font-bold text-slate-900">Readiness Overview</h3>
                                 <p className="text-xs text-slate-500">Live score based on your personal progress across {analytics?.totalQuestions || 317} questions</p>    
                             </div>
-                            <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-slate-600">Target Type:</span>
-                                <span className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-lg uppercase">
-                                    {readiness.target || 'PRODUCT_BASED'}
-                                </span>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    id="sync-leetcode-dsa-btn"
+                                    onClick={handleSyncLeetcode}
+                                    disabled={syncing}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow-sm shadow-indigo-600/20 transition-all cursor-pointer"
+                                >
+                                    <svg className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    <span>{syncing ? 'Syncing...' : 'Sync with LeetCode'}</span>
+                                </button>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-semibold text-slate-600">Target:</span>
+                                    <span className="px-3 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold rounded-lg uppercase">
+                                        {readiness.target || 'PRODUCT_BASED'}
+                                    </span>
+                                </div>
                             </div>
                         </div>
 

@@ -137,11 +137,58 @@ const getReadiness = async (req, res) => {
     }
 };
 
+// Sync DSA sheet with latest LeetCode submissions
+const syncLeetcode = async (req, res) => {
+    try {
+        const PlatformAccount = require('../models/PlatformAccount');
+        const account = await PlatformAccount.findOne({
+            userId: req.userId,
+            platform: { $regex: /^leetcode$/i }
+        });
+
+        if (!account || !account.username) {
+            return res.status(404).json({
+                message: "No LeetCode account connected. Please connect your LeetCode account in Profile settings."
+            });
+        }
+
+        const { leetcodeAPICall } = require('../services/leetcodeService');
+        const { saveLeetcodeSnapshot } = require('../repositories/leetcodeRepository');
+        const { syncLeetcodeAcceptedSubmissions } = require('../repositories/dsaRepository');
+
+        const stats = await leetcodeAPICall(account.username);
+        if (stats) {
+            await saveLeetcodeSnapshot(stats, req.userId);
+        }
+
+        let dsaSync = { updated: 0, matched: 0, matchedQuestions: [], unmatchedTitles: [] };
+        if (stats?.recentAcSubmissions && stats.recentAcSubmissions.length > 0) {
+            dsaSync = await syncLeetcodeAcceptedSubmissions(req.userId, stats.recentAcSubmissions);
+        }
+
+        const readiness = dsaSync.readiness || await getDsaReadiness(req.userId);
+
+        res.json({
+            message: "DSA sheet synchronized with LeetCode successfully",
+            sync: dsaSync,
+            readiness
+        });
+    } catch (error) {
+        console.error("syncLeetcode error:", error);
+        res.status(500).json({
+            message: "Failed to synchronize DSA sheet with LeetCode",
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     updateProgress,
     getProgress,
     getAnalytics,
     updateTarget,
     getTarget,
-    getReadiness
+    getReadiness,
+    syncLeetcode
 };
+

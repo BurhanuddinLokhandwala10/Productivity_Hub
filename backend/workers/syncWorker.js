@@ -21,10 +21,11 @@ const worker = new Worker(
         if (job.name === "github-sync") {
             const account = await PlatformAccount.findOne({
                 userId,
-                platform: "github"
+                platform: { $regex: /^github$/i }
             });
 
             if (!account) {
+                console.error(`[github-sync] No GitHub account for userId=${userId}`);
                 throw new Error("GitHub account not found");
             }
 
@@ -99,14 +100,22 @@ const worker = new Worker(
         }
 
         if (job.name === "leetcode-sync") {
+            // Case-insensitive platform lookup to handle inconsistent registration values
             const account = await PlatformAccount.findOne({
                 userId,
-                platform: "leetcode"
+                platform: { $regex: /^leetcode$/i }
             });
 
             if (!account) {
+                // Diagnostic: log what accounts exist for this userId (without credentials)
+                const allAccounts = await PlatformAccount.find({ userId }).select('platform syncStatus');
+                console.error(`[leetcode-sync] No leetcode account for userId=${userId}. Existing accounts:`,
+                    allAccounts.map(a => ({ platform: a.platform, status: a.syncStatus }))
+                );
                 throw new Error("LeetCode account not found");
             }
+
+            console.log(`[leetcode-sync] Found account for userId=${userId}, username=${account.username}`);
 
             try {
                 await PlatformAccount.updateOne(
@@ -161,12 +170,21 @@ const worker = new Worker(
 
         if (job.name === "sync-all-users") {
             const accounts = await PlatformAccount.find({});
+            const queuedPairs = new Set();
+            let scheduledCount = 0;
 
             for (const account of accounts) {
+                const normPlatform = (account.platform || '').toLowerCase().trim();
+                if (!['github', 'leetcode'].includes(normPlatform)) continue;
+
+                const pairKey = `${account.userId.toString()}-${normPlatform}`;
+                if (queuedPairs.has(pairKey)) continue;
+                queuedPairs.add(pairKey);
+
                 // Deduplicate scheduled sync jobs so concurrent runs for same user/platform are avoided
-                const dedupId = `${account.platform}-sync-${account.userId}-${Math.floor(Date.now() / 60000)}`;
+                const dedupId = `${normPlatform}-sync-${account.userId}-${Math.floor(Date.now() / 60000)}`;
                 await syncQueue.add(
-                    `${account.platform}-sync`,
+                    `${normPlatform}-sync`,
                     { userId: account.userId.toString() },
                     {
                         jobId: dedupId,
@@ -174,10 +192,11 @@ const worker = new Worker(
                         backoff: { type: "exponential", delay: 5000 }
                     }
                 );
+                scheduledCount++;
             }
 
             console.log(
-                `Scheduled sync jobs created for ${accounts.length} accounts`
+                `Scheduled sync jobs created for ${scheduledCount} unique user-platform accounts`
             );
 
             return;

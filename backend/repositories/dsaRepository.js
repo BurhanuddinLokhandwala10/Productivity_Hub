@@ -232,48 +232,167 @@ const findQuestionBySlug = async (slug) => {
 
 // 9. Sync accepted submissions to DSA sheet
 const syncLeetcodeAcceptedSubmissions = async (userId, acceptedSubmissions) => {
-    if (!userId || !Array.isArray(acceptedSubmissions) || acceptedSubmissions.length === 0) {
-        return { updated: 0, matched: 0, matchedQuestions: [] };
+    if (
+        !userId ||
+        !Array.isArray(acceptedSubmissions) ||
+        acceptedSubmissions.length === 0
+    ) {
+        return {
+            updated: 0,
+            matched: 0,
+            matchedQuestions: [],
+            unmatchedTitles: []
+        };
     }
 
-    const slugSet = new Set();
+    const { SLUG_OVERRIDES, generateSlug } = require("../utils/slugUtils");
+
+    // Remove duplicate submissions for the same LeetCode problem.
+    const uniqueSubmissions = new Map();
+
     for (const sub of acceptedSubmissions) {
-        const s = (sub?.titleSlug || sub?.slug || '').trim();
-        if (s) {
-            slugSet.add(s);
+        const rawSlug = (sub?.titleSlug || sub?.slug || "").trim();
+        const title = (sub?.title || "").trim();
+        const slug = rawSlug || generateSlug(title);
+
+        if (slug) {
+            const key = slug.toLowerCase();
+            if (!uniqueSubmissions.has(key)) {
+                // Check if title has an explicit canonical override
+                const overrideSlug = SLUG_OVERRIDES[title] || null;
+                uniqueSubmissions.set(key, { slug, title, overrideSlug });
+            }
         }
     }
 
-    const uniqueSlugs = Array.from(slugSet);
-    if (uniqueSlugs.length === 0) {
-        return { updated: 0, matched: 0, matchedQuestions: [] };
+    const matchedQuestions = [];
+    const unmatchedTitles = [];
+    const matchedQuestionIds = new Set();
+
+    // 1. First, batch match using canonical LeetCode slugs (including overrides)
+    const allSlugsToSearch = new Set();
+    for (const { slug, overrideSlug } of uniqueSubmissions.values()) {
+        allSlugsToSearch.add(slug.toLowerCase());
+        if (overrideSlug) allSlugsToSearch.add(overrideSlug.toLowerCase());
     }
 
-    const matchRes = await pool.query(
-        `
-        SELECT id, question, difficulty, relevance, leetcode_slug 
-        FROM questions 
-        WHERE leetcode_slug = ANY($1::text[])
-        ORDER BY id ASC
-        `,
-        [uniqueSlugs]
+    const slugArray = Array.from(allSlugsToSearch);
+    const batchSlugResult = await pool.query(
+        `SELECT id, question, difficulty, relevance, leetcode_slug
+         FROM questions
+         WHERE LOWER(TRIM(COALESCE(leetcode_slug, ''))) = ANY($1::text[])
+         ORDER BY id ASC`,
+        [slugArray]
     );
 
-    const matchedQuestions = matchRes.rows;
-    if (matchedQuestions.length === 0) {
-        return { updated: 0, matched: 0, matchedQuestions: [] };
+    // Group matched questions by their lowercase slug
+    const questionsBySlug = new Map();
+    for (const q of batchSlugResult.rows) {
+        const s = (q.leetcode_slug || "").toLowerCase().trim();
+        if (!questionsBySlug.has(s)) {
+            questionsBySlug.set(s, []);
+        }
+        questionsBySlug.get(s).push(q);
     }
 
-    for (const q of matchedQuestions) {
-        await upsertUserProgress(userId, q.id, 'SOLVED');
+    // Process each unique submission
+    for (const { slug, title, overrideSlug } of uniqueSubmissions.values()) {
+        const key = slug.toLowerCase();
+        const overrideKey = overrideSlug?.toLowerCase();
+
+        let matches = questionsBySlug.get(key) || [];
+        if (matches.length === 0 && overrideKey) {
+            matches = questionsBySlug.get(overrideKey) || [];
+        }
+
+        // 2. Fallback: if no slug match, try title matching
+        if (matches.length === 0 && title) {
+            const titleRes = await pool.query(
+                `SELECT id, question, difficulty, relevance, leetcode_slug
+                 FROM questions
+                 WHERE LOWER(
+                     REGEXP_REPLACE(TRIM(question), '[^a-z0-9]+', ' ', 'g')
+                 ) = LOWER(
+                     REGEXP_REPLACE(TRIM($1), '[^a-z0-9]+', ' ', 'g')
+                 )
+                 ORDER BY id ASC
+                 LIMIT 1`,
+                [title]
+            );
+
+            if (titleRes.rows.length > 0) {
+                matches = titleRes.rows;
+                // Backfill the canonical slug
+                for (const q of matches) {
+                    if (!q.leetcode_slug?.trim()) {
+                        await pool.query(
+                            `UPDATE questions
+                             SET leetcode_slug = $1
+                             WHERE id = $2 AND (leetcode_slug IS NULL OR TRIM(leetcode_slug) = '')`,
+                            [slug, q.id]
+                        );
+                        q.leetcode_slug = slug;
+                    }
+                }
+            }
+        }
+
+        if (matches.length === 0) {
+            unmatchedTitles.push({ title, slug });
+            continue;
+        }
+
+        // Process all matching questions (handles multi-topic entries)
+        for (const question of matches) {
+            if (!matchedQuestionIds.has(question.id)) {
+                matchedQuestionIds.add(question.id);
+
+                // Ensure canonical slug is set on the question if missing
+                if (!question.leetcode_slug?.trim()) {
+                    await pool.query(
+                        `UPDATE questions
+                         SET leetcode_slug = $1
+                         WHERE id = $2 AND (leetcode_slug IS NULL OR TRIM(leetcode_slug) = '')`,
+                        [slug, question.id]
+                    );
+                }
+
+                // Mark the matched question as solved for this user.
+                await upsertUserProgress(userId, question.id, "SOLVED");
+
+                matchedQuestions.push({
+                    ...question,
+                    leetcode_slug: question.leetcode_slug || slug
+                });
+
+                console.log(`[dsaSync] Solved progress saved: userId=${userId}, questionId=${question.id} ("${question.question}")`);
+            }
+        }
     }
+
+    // Recalculate DSA readiness right after synchronization
+    let readiness = null;
+    try {
+        const { getDsaReadiness } = require("../services/developerAnalyticsService");
+        readiness = await getDsaReadiness(userId);
+    } catch (e) {
+        console.error("[dsaSync] Failed to recalculate readiness:", e.message);
+    }
+
+    console.log(
+        `[dsaSync] Complete: userId=${userId}, matched=${matchedQuestions.length}, unmatched=${unmatchedTitles.length}` +
+        (readiness ? `, recalculatedScore=${readiness.readinessScore}% (${readiness.label})` : '')
+    );
 
     return {
         updated: matchedQuestions.length,
         matched: matchedQuestions.length,
-        matchedQuestions
+        matchedQuestions,
+        unmatchedTitles,
+        readiness
     };
 };
+
 
 module.exports = {
     findQuestionById,

@@ -1,84 +1,113 @@
+/**
+ * One-time migration: Populate leetcode_slug for all 282 DSA Bible questions.
+ *
+ * - Uses explicit SLUG_OVERRIDES for questions whose titles don't map cleanly.
+ * - Falls back to a deterministic slug generator for standard titles.
+ * - ONLY fills slugs that are currently NULL or empty — never overwrites existing valid slugs.
+ * - Safe to run multiple times (idempotent).
+ *
+ * Usage:
+ *   cd backend && node scripts/migrate_leetcode_slugs.js
+ */
 const dotenv = require('dotenv');
-dotenv.config({ path: 'c:/Users/USER/Documents/Study/Project/Productivity_Hub/backend/.env' });
-const { pool } = require('c:/Users/USER/Documents/Study/Project/Productivity_Hub/backend/config/db');
+const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+const { pool } = require('../config/db');
 
-// Explicit overrides for questions with descriptive subtitles, alternate names, or formula text
-const SLUG_OVERRIDES = {
-    "Maximum Subarray (Kadane's)": "maximum-subarray",
-    "Sort Colors (Dutch National Flag)": "sort-colors",
-    "Rotate Image (90 degrees)": "rotate-image",
-    "Implement strStr() / Needle in Haystack": "find-the-index-of-the-first-occurrence-in-a-string",
-    "Insert Delete GetRandom O(1)": "insert-delete-getrandom-o1",
-    "Sqrt(x)": "sqrtx",
-    "Sort an Array (Merge/Quick from scratch)": "sort-an-array",
-    "01 Matrix (Distance to nearest 0)": "01-matrix",
-    "01 Matrix": "01-matrix",
-    "Implement Trie (Prefix Tree)": "implement-trie-prefix-tree",
-    "Dijkstra's Algorithm (Network Delay Time)": "network-delay-time",
-    "Bellman-Ford (Cheapest Flights K Stops)": "cheapest-flights-within-k-stops",
-    "Minimum Spanning Tree (Kruskal/Prim)": "min-cost-to-connect-all-points",
-    "0/1 Knapsack (Target Sum)": "target-sum",
-    "Best Time to Buy/Sell Stock with Cooldown": "best-time-to-buy-and-sell-stock-with-cooldown",
-    "Best Time to Buy/Sell Stock with Fee": "best-time-to-buy-and-sell-stock-with-transaction-fee",
-    "Subsets (bitmask)": "subsets",
-    "Subsets": "subsets",
-    "Subsets II": "subsets-ii",
-    "Pow(x, n)": "powx-n"
-};
+const { SLUG_OVERRIDES, generateSlug } = require('../utils/slugUtils');
 
-function generateSlug(questionText) {
-    const trimmed = questionText.trim();
-    if (SLUG_OVERRIDES[trimmed]) {
-        return SLUG_OVERRIDES[trimmed];
-    }
-
-    // Strip trailing parenthesis if it exists (e.g. "Some Problem (Extra)")
-    let clean = trimmed;
-    if (clean.includes('(') && clean.endsWith(')')) {
-        clean = clean.replace(/\s*\([^)]*\)$/, '');
-    }
-
-    return clean
-        .toLowerCase()
-        .replace(/['']/g, '') // Remove apostrophes e.g. Dijkstra's -> Dijkstras
-        .replace(/[^a-z0-9]+/g, '-') // Replace non-alphanumeric with hyphens
-        .replace(/^-+|-+$/g, ''); // Trim hyphens
-}
 
 async function migrate() {
     const client = await pool.connect();
     try {
-        console.log("Adding leetcode_slug column if not exists...");
+        console.log("── LeetCode Slug Migration ──────────────────────────");
+
+        // Ensure column exists
         await client.query(`
             ALTER TABLE questions 
             ADD COLUMN IF NOT EXISTS leetcode_slug TEXT;
         `);
-
         await client.query(`
             CREATE INDEX IF NOT EXISTS idx_questions_leetcode_slug 
             ON questions(leetcode_slug);
         `);
 
-        const questionsRes = await client.query('SELECT id, question, leetcode_slug FROM questions');
-        console.log(`Found ${questionsRes.rows.length} questions.`);
+        // Only fetch questions that are missing a slug
+        const questionsRes = await client.query(
+            `SELECT id, question, leetcode_slug FROM questions
+             WHERE leetcode_slug IS NULL OR TRIM(leetcode_slug) = ''
+             ORDER BY id`
+        );
+        console.log(`Found ${questionsRes.rows.length} questions missing leetcode_slug.`);
+
+        if (questionsRes.rows.length === 0) {
+            console.log("✅ All questions already have slugs. Nothing to do.");
+            return;
+        }
 
         let updated = 0;
+        let overrideUsed = 0;
+        let generated = 0;
+        const unmapped = [];
+
         for (const row of questionsRes.rows) {
             const slug = generateSlug(row.question);
+
+            if (!slug) {
+                unmapped.push({ id: row.id, question: row.question });
+                continue;
+            }
+
             await client.query(
-                'UPDATE questions SET leetcode_slug = $1 WHERE id = $2',
+                `UPDATE questions SET leetcode_slug = $1
+                 WHERE id = $2
+                   AND (leetcode_slug IS NULL OR TRIM(leetcode_slug) = '')`,
                 [slug, row.id]
             );
             updated++;
+
+            if (SLUG_OVERRIDES[row.question.trim()]) {
+                overrideUsed++;
+            } else {
+                generated++;
+            }
         }
 
-        console.log(`Successfully migrated ${updated} questions with leetcode_slug.`);
+        console.log(`\n── Results ──────────────────────────────────────────`);
+        console.log(`  Updated:       ${updated}`);
+        console.log(`  Via override:  ${overrideUsed}`);
+        console.log(`  Via generator: ${generated}`);
+        if (unmapped.length > 0) {
+            console.log(`  ⚠ Unmapped:    ${unmapped.length}`);
+            unmapped.forEach(u => console.log(`    - [id=${u.id}] "${u.question}"`));
+        }
 
-        // Verify sample
-        const sampleRes = await client.query('SELECT id, question, leetcode_slug FROM questions ORDER BY id LIMIT 15');
-        console.log("Sample migrated questions:", sampleRes.rows);
+        // Verification
+        const verifyRes = await client.query(`
+            SELECT
+                COUNT(*) AS total,
+                COUNT(CASE WHEN leetcode_slug IS NOT NULL AND TRIM(leetcode_slug) != '' THEN 1 END) AS with_slug,
+                COUNT(CASE WHEN leetcode_slug IS NULL OR TRIM(leetcode_slug) = '' THEN 1 END) AS without_slug
+            FROM questions
+        `);
+        const v = verifyRes.rows[0];
+        console.log(`\n── Verification ─────────────────────────────────────`);
+        console.log(`  Total questions:  ${v.total}`);
+        console.log(`  With slug:        ${v.with_slug}`);
+        console.log(`  Without slug:     ${v.without_slug}`);
+
+        // Show sample
+        const sampleRes = await client.query(
+            `SELECT id, question, leetcode_slug FROM questions ORDER BY id LIMIT 10`
+        );
+        console.log(`\n── Sample ───────────────────────────────────────────`);
+        sampleRes.rows.forEach(r =>
+            console.log(`  [${r.id}] ${r.question} → ${r.leetcode_slug}`)
+        );
+
+        console.log("\n✅ Slug migration completed successfully.");
     } catch (err) {
-        console.error("Migration failed:", err);
+        console.error("❌ Migration failed:", err);
         throw err;
     } finally {
         client.release();
